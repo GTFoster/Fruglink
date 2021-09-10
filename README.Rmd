@@ -9,22 +9,21 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+#Research Questions:
+## 1. How well are we able to predict missing frugivory links across diverse taxa?
+## 2. How do link prediction methods using trait-based approaches perform compared to phylogenetic models?
+## 3. Compared to the entire network, are we able to predict better or worse on particular taxonomic or functional groups, or for more generalist or specialist nodes. 
+## 4. If we train network reconstruction methods on only native interactions, how do they perform when applied to nonnative species?
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
-```
+## Methods:
+Using Atlantic Forest data from Bello 2021: (7344 links with native plants, 857 nonnative links). Split into test and training sets, and train a variety of network reconstruction model types including: 
+a) methods agnostic to node biology (prefferential-attatchment models, hierarchical structure (Clauset 2008)
+b )Models incorporating phylogenetic information (in the style of Elmasri 2020)
+c) Trait-based methods, and
+D) Combinations of the above. 
 
-## Including Plots
+Comparing the performance of these competing models using network-wide measures of link prediction performance such as AUC will allow us to answer research questions 1&2. We can then hopefully answer question 3 by comparing the accuracy of particular link sets (ex. Can we detect a phylogenetic signal in how well we’re able to predict host sets using a metric like Moran’s I). We can then apply our best fitting link prediction models to the entire set of native hosts, and then test performance on non-native species to evaluate question 4. In addition to the main research questions outlined above, this project also allows us to predict possible unobserved links, as well as how incorporating of those links may influence overall network structure or stability. 
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Papers Methods to look at:

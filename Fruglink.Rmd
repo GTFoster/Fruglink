@@ -1,0 +1,51 @@
+---
+title: "Frugivory"
+author: "Grant Foster"
+date: "9/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(igraph)
+```
+
+
+```{r}
+dat <- read.csv("ATLANTIC_frugivory.csv")
+```
+
+```{r}
+uniq<- dat %>% select(., Frugivore_Species, Plant_Species) %>% unique()
+
+web <- data.frame(
+    from = uniq$Frugivore_Species,
+    to = uniq$Plant_Species
+  ) %>% graph_from_data_frame(directed=FALSE)
+
+
+V(web)$type <- bipartite.mapping(web)$type
+is.bipartite(web)
+plot(web, layout=layout_as_bipartite(web))
+
+layout_as_bipartite(web)
+V(web)$type
+```
+
+```{r}
+V(web)$type
+V(web)$color <-  NA
+V(web)$color[V(web)$type==TRUE] <- "red"
+V(web)$color[V(web)$type==FALSE] <- "blue"
+
+plot(web, layout=layout_as_bipartite(web), edge.width=0.25, vertex.label=NA, vertex.size=1)
+
+mat <-as.matrix(get.adjacency(graph.data.frame(uniq)))
+heatmap(mat)
+
+```
