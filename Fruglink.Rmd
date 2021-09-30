@@ -28,13 +28,15 @@ web <- data.frame(
     to = uniq$Plant_Species
   ) %>% graph_from_data_frame(directed=FALSE)
 
+mat <-get.adjacency(web, type="both", sparse = FALSE)
+isSymmetric.matrix(mat)
 
 V(web)$type <- bipartite.mapping(web)$type
-is.bipartite(web)
+igraph::is.bipartite(web)
 plot(web, layout=layout_as_bipartite(web))
 
 layout_as_bipartite(web)
-V(web)$type
+
 ```
 
 ```{r}
@@ -45,7 +47,540 @@ V(web)$color[V(web)$type==FALSE] <- "blue"
 
 plot(web, layout=layout_as_bipartite(web), edge.width=0.25, vertex.label=NA, vertex.size=1)
 
-mat <-as.matrix(get.adjacency(graph.data.frame(uniq)))
-heatmap(mat)
+
+plot_data <- dat %>% mutate(
+        to = factor(Plant_Species, levels = unique(c(dat$Plant_Species, dat$Frugivore_Species))),
+        from = factor(Frugivore_Species, levels = unique(c(dat$Plant_Species, dat$Frugivore_Species))))
+
+plot_data <- dat %>% mutate(
+        to = factor(Plant_Species),
+        from = factor(Frugivore_Species))
+
+ggplot(plot_data, aes(x = from, y = to)) +
+      geom_raster() +
+      theme_bw() +
+      # Because we need the x and y axis to display every node,
+      # not just the nodes that have connections to each other,
+      # make sure that ggplot does not drop unused factor levels
+      scale_x_discrete(drop = FALSE) +
+      scale_y_discrete(drop = FALSE) +
+      theme(
+        # Rotate the x-axis lables so they are legible
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        # Force the plot into a square aspect ratio
+        aspect.ratio = 1,
+        # Hide the legend (optional)
+        legend.position = "none")
 
 ```
+I need a phylogeny for my species
+
+The frugivore one I get from tree of life is ok, but the plant one kind of sucks-huge polytomies at really pretty high taxonomic levels. 
+
+## Messing with Phylogeneti Trees
+```{r eval=FALSE}
+library(rotl)
+plant_names <- rotl::tnrs_match_names(unique(dat$Plant_Species))
+plant_names %<>% filter(., approximate_match ==FALSE) #Only keep correct matches
+plant_names %<>% filter(., flags != "incertae_sedis_inherited")
+plant_names %<>% filter(., flags != "hybrid, sibling_higher")
+
+
+dat %<>% filter(., Plant_Species %in% plant_names$unique_name) 
+
+
+tree <- ape::read.nexus("Jansenss_2020_AngiTree.tre")
+
+plot(tree, type="fan")
+
+dat$PlantName_Under <- gsub(" ","_", dat$Plant_Species)
+
+table(unique(dat$PlantName_Under) %in% tree$tip.label)
+
+plant_tree <- rotl::tol_induced_subtree(ott_ids = plant_names$ott_id)
+
+
+ape::plot.phylo(plant_tree, show.tip.label = FALSE, type="fan", show.node.label = FALSE)
+plot(plant_tree, show.tip.label=FALSE)
+
+frug_names <- rotl::tnrs_match_names(unique(dat$Frugivore_Species))
+frug_names %<>% filter(., approximate_match ==FALSE) #Only keep correct matches
+frug_names %<>% filter(., flags != "incertae_sedis_inherited")
+frug_names %<>% filter(., flags != "hybrid, sibling_higher")
+
+frug_tree <- rotl::tol_induced_subtree(ott_ids = frug_names$ott_id)
+
+ape::plot.phylo(frug_tree, show.tip.label = FALSE, type="fan", show.node.label = FALSE)
+plot(frug_tree, show.tip.label=FALSE)
+```
+
+
+Making a smaller example
+
+```{r}
+set.seed(24601)
+
+test_web <- igraph::delete.edges(web, sample(1:length(E(web)), 3658, replace = FALSE)) #remove 50% of our data
+#plot(web, layout=layout_as_bipartite(web))
+plot(test_web, layout=layout_as_bipartite(test_web))
+
+
+test_adj <- get.adjacency(test_web, type="both", sparse = FALSE)
+
+lattice::levelplot(test_adj)
+isSymmetric.matrix(test_adj)
+```
+
+Creating link prediction function
+
+Note: If I make a strictly upper triangular matrix (non-symmetric), it's eigenvalues will all be 0. So we need to see a symmetric matrix. 
+
+We want ideally to minimize the Sigma[f(delta_kk)-U^T * A' * Uk]^2, essentially a sum of squares.
+```{r}
+U <-eigen(mat)$vectors
+L <- eigen(mat)$values
+table(mat)
+table(mat)/sum(table(mat))
+
+
+# A = U*L*U^T
+test <- U %*% diag(L) %*% t(U)
+test <- round(test, digits=3) #Rounding errors make our 0's into super small values
+table(test==mat) #This should be true
+
+#A' = F(A) = U*F(L)*U^T, where F is our kernel function relating our training set (A) to test set (A')
+#We want to minimize |F(A)-A'|, where
+
+U_train <- eigen(test_adj)$vectors
+L_train <- eigen(test_adj)$values
+
+target_V <- t(U_train) %*% mat %*% U_train
+target_V <- diag(target_V)
+
+plot(x=L_train, y=target_V, col="dodger blue", pch=16)
+
+```
+
+The first kernel that we use is odd path counting. Here we look at weighted sum of several odd powers of the original adjacency matrix (recall that k-th power of an adjacency matrix refers to numbers of k-hop neighbours from every node). The higher the value, the more likely it is for two vertices to be connected.
+
+I think this is mostly wrong. I hope to fix it in the future.
+
+```{r}
+library(expm)
+
+odd_kernal <- function(input, max_path){
+  index <- seq(from=1, to=max_path, by=2)
+  #index <- index[-1]
+  output <- 0
+  for(i in index){
+    #print(i)
+    output <- output + (test_adj %^% i)
+  }
+  return(output)
+}
+
+odd_paths_V1 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 1) %*% U_train
+odd_paths_pred1 <- diag(odd_paths_V1)
+
+odd_paths_V3 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 3) %*% U_train
+odd_paths_pred3 <- diag(odd_paths_V3)
+
+odd_paths_V5 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 5) %*% U_train
+odd_paths_pred5 <- diag(odd_paths_V5)
+
+odd_paths_V7 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 7) %*% U_train
+odd_paths_pred7 <- diag(odd_paths_V7)
+
+odd_paths_V9 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 9) %*% U_train
+odd_paths_pred9 <- diag(odd_paths_V9)
+
+plot(x=L_train, y=target_V, col="dodger blue", pch=16)
+points(x=L_train, y=odd_paths_pred1, col="red", pch=16)
+points(x=L_train, y=odd_paths_pred3, col="orange", pch=16)
+points(x=L_train, y=odd_paths_pred5, col="green", pch=16)
+points(x=L_train, y=odd_paths_pred7, col="purple", pch=16)
+points(x=L_train, y=odd_paths_pred9, col="navy", pch=16)
+legend(1, 1, legend=c("1 (base)", "3", "5", "7", "9"),
+       col=c("red", "orange", "green", "purple", "navy"), pch=16, cex=0.8)
+
+all.equal(dim(odd_paths_V1), dim(mat))
+
+edgelist <- data.frame(matrix(mat, dimnames=list(t(outer(colnames(mat), rownames(mat), FUN=paste)), NULL)))
+colnames(edgelist) <- "truth"
+edgelist <- rownames_to_column(edgelist, var="link")
+
+
+colnames(odd_paths_V1) <- colnames(mat)
+rownames(odd_paths_V1) <- rownames(mat)
+odd_paths_1L <- data.frame(matrix(odd_paths_V1, dimnames=list(t(outer(colnames(odd_paths_V1), rownames(odd_paths_V1), FUN=paste)), NULL)))
+colnames(odd_paths_1L) <- "Path1"
+odd_paths_1L <- rownames_to_column(odd_paths_1L, var="link")
+
+colnames(odd_paths_V3) <- colnames(mat)
+rownames(odd_paths_V3) <- rownames(mat)
+odd_paths_3L <- data.frame(matrix(odd_paths_V3, dimnames=list(t(outer(colnames(odd_paths_V3), rownames(odd_paths_V3), FUN=paste)), NULL)))
+colnames(odd_paths_3L) <- "Path3"
+odd_paths_3L <- rownames_to_column(odd_paths_3L, var="link")
+
+ROC_data <- left_join(edgelist, odd_paths_1L, by="link")
+ROC_data <- left_join(ROC_data, odd_paths_3L, by="link")
+
+simple_roc <- function(labels, scores){
+  labels <- labels[order(scores, decreasing=TRUE)]
+  data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
+}
+
+temp <- simple_roc(labels=ROC_data$truth, scores=ROC_data$Path1)
+temp2 <- simple_roc(labels=ROC_data$truth, scores=ROC_data$Path3)
+plot(x=temp$FPR, y=temp$TPR, type="l", col="blue")
+lines(x=temp2$FPR, y=temp2$TPR, type="l", col="red")
+
+library(pROC)
+
+
+AUC_Odd1 <- roc(response=ROC_data$truth, predictor=ROC_data$Path1)
+AUC_Odd3 <- roc(response=ROC_data$truth, predictor=ROC_data$Path3)
+
+auc(AUC_Odd1)
+plot(AUC_Odd1)
+
+auc(AUC_Odd3)
+plot(AUC_Odd3)
+
+```
+
+
+Step back: Let's predict based on traits. First, I'll start with a pretty simple trait matching approach.
+```{r}
+cor.test(x=dat$fruit_diameter, y=dat$Frug_Mean_Gape_Size) 
+summary(lm(dat$Frug_Mean_Gape_Size~dat$fruit_diameter))
+
+#Alright, these things (as we'd guess) are highly correlated. Let's use them to predict links.
+
+test_long <- data.frame(get.edgelist(test_web))
+colnames(test_long) <- c("Frugivore_Species", "Plant_Species")
+
+test_dat <- left_join(test_long, dat, by=c("Frugivore_Species", "Plant_Species"))
+
+
+#Perform the regression on our test data
+test_dat %<>% filter(., is.na(Frug_Mean_Gape_Size)==FALSE & is.na(fruit_diameter)==FALSE)
+Di_Gape_lm <- lm(Frug_Mean_Gape_Size~fruit_diameter, data=test_dat)
+summary(Di_Gape_lm)
+
+test_dat$Di_Gape_SSQ <- Di_Gape_lm$residuals^2 #This is only doing it on the test version; not the full dataset!
+
+dat %<>% filter(., is.na(Frug_Mean_Gape_Size)==FALSE & is.na(fruit_diameter)==FALSE)
+dat %<>% filter(., is.na(Frug_Mean_Gape_Size)==FALSE & is.na(fruit_diameter)==FALSE)
+dat %<>% filter(., is.na(Frugivory_score)==FALSE & is.na(fruit_diameter)==FALSE)
+dat %<>% filter(., is.na(fruit_length)==FALSE & is.na(fruit_diameter)==FALSE)
+
+dat$pred_gape <- stats::predict(object=Di_Gape_lm, newdata=data.frame(dat))
+
+dat$Di_Gape_SSQ <- (dat$pred_gape - dat$Frug_Mean_Gape_Size)^2 #This is for all the real interactions; we need all 
+
+full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species)
+
+full_L <-  dat %>% select(., Frugivore_Species, Frug_Mean_Gape_Size, Frug_Class, Frug_Order, Frug_Family, Frug_Genus, Frug_Epitetus, Frug_Group, Frug_Body_Mass, Frugivory_score, Frug_Migration_status, Frug_IUCN, Frug_Population_Trend) %>% unique() %>% left_join(full_L, ., by="Frugivore_Species")
+
+full_L <-  dat %>% select(., Plant_Species, fruit_diameter, fruit_length, Fruit_color, Plant_distribution, Plant_origin, Plant_Form, Plants_IUCN) %>% unique() %>% left_join(full_L, ., by="Plant_Species")
+
+full_L$pred_gape <- stats::predict(object=Di_Gape_lm, newdata=data.frame(full_L))
+full_L$Di_Gape_SSQ <- (full_L$pred_gape - full_L$Frug_Mean_Gape_Size)^2
+
+full_L <- dat %>% select(., Frugivore_Species, Plant_Species) %>% mutate(., real=1) %>% left_join(full_L, ., by=c("Frugivore_Species", "Plant_Species"))
+
+full_L$real[is.na(full_L$real)==TRUE] <- 0
+
+AUC_gape_fruit <- roc(data=data.frame(full_L), response=real, predictor=Di_Gape_SSQ)
+AUC_gape_fruit
+plot(AUC_gape_fruit)
+```
+
+That was a pretty ham-fisted linear approach. How should we go about this otherwise? At first I thought logistic regression might be the best way to go, but realized the general style doens't care about matching traits, just their values. 
+
+What could be a good approach is to do a generalized linear model. 
+```{r}
+
+pointsobject <- full_L %>% dplyr::select(., Frugivore_Species, Plant_Species, real, Frug_Mean_Gape_Size, Frug_Body_Mass, Frugivory_score, fruit_diameter, fruit_length, Fruit_color)
+
+p <- pointsobject[(pointsobject[,'real'] == 1), 4:(ncol(pointsobject)-1)]
+bgrd <- pointsobject[,4:(ncol(pointsobject)-1)]
+
+#Recreating the plug and play approach
+
+  mean.p <- colMeans(p, na.rm = TRUE)         # estimated mean of presence points
+  mean.bgrd <- colMeans(bgrd)   # estimated mean of background points
+  sigma.p <- stats::cov(p)             # estimated covariance of presence points
+  sigma.bgrd <- stats::cov(bgrd)       # estimated covariance of background points
+    
+  require(corpcor)
+    # robust estimated covariance of presence points
+    p.est <- as.numeric(cov.shrink(p, verbose= TRUE))  
+    sigma.p <- matrix(as.numeric(p.est), nrow=sqrt(length(p.est)))  #make it into a square matrix?
+    # robust estimated covariance of background points
+    bgrd.est <- as.numeric(cov.shrink(bgrd, verbose = TRUE))    
+    sigma.bgrd <- matrix(as.numeric(bgrd.est), nrow=sqrt(length(bgrd.est))) # reformat
+
+    model=list(mean.p=mean.p, sigma.p=sigma.p, mean.bgrd=mean.bgrd, sigma.bgrd=sigma.bgrd)  
+
+    
+predict.pp.gauss <- function(model, x){
+  require(mvtnorm)
+  f1 <- dmvnorm(x, mean=model$mean.p, sigma=model$sigma.p, log=TRUE)
+  f0 <- dmvnorm(x, mean=model$mean.bgrd, sigma=model$sigma.bgrd, log=TRUE)
+  return(S=exp(f1-f0))
+} 
+
+pp.kde <- function(p, bgrd){
+  require(np)
+  f1 <- npudens(p, bwmethod='normal-reference')
+  f0 <- npudens(bgrd, bwmethod='normal-reference')
+  return(model=list(f1=f1,f0=f0))
+}
+
+predict.pp.kde <- function(model, x){
+  require(np)
+  f1 <- fitted(npudens(bws=model$f1$bws, edat=data.frame(x), bwmethod='normal-reference'))
+  f0 <- fitted(npudens(bws=model$f0$bws, edat=data.frame(x), bwmethod='normal-reference'))
+  return(S=f1/f0)
+}
+
+red.preds.gauss <- predict.pp.gauss(model, x=bgrd)
+full_L$suit.gauss <- red.preds.gauss
+
+stuff <- pp.kde(p, bgrd)
+
+str(stuff)
+red.preds.kde <- predict.pp.kde(stuff, bgrd)
+
+
+full_L$suit.kde <- red.preds.kde
+
+AUC_PP <- roc(data=data.frame(full_L), response=real, predictor=suit)
+AUC_PP
+plot(AUC_PP)
+```
+Simplifying the problem: for both complexity and runtime's sake
+Note:frugivory is not actually meaningful, but it's still in. 
+
+14 bat species, 47 plant species.
+```{r}
+#Make long form of just bat intearactions.
+bats <- dplyr::filter(dat, Frug_Group=="Bats")
+batsL <- tidyr::expand(bats, Frugivore_Species, Plant_Species)
+
+#Left_Join in our trait data and denote real entries
+batsL <-  bats %>% select(., Frugivore_Species, Frug_Mean_Gape_Size, Frug_Body_Mass) %>% unique() %>% left_join(batsL, ., by="Frugivore_Species")
+batsL <-  dat %>% select(., Plant_Species, fruit_diameter, fruit_length) %>% unique() %>% left_join(batsL, ., by="Plant_Species")
+batsL <- bats %>% select(., Frugivore_Species, Plant_Species) %>% mutate(., real=1) %>% left_join(batsL, ., by=c("Frugivore_Species", "Plant_Species"))
+batsL$real[is.na(batsL$real)==TRUE] <- 0
+
+batsL %<>% filter(., Frugivore_Species != "Carollia castanea") #wrong gape size
+
+#Sample our overall data
+batsL_sample <- batsL[sample(nrow(batsL)/2, replace=T),]
+
+
+
+p <- batsL_sample[batsL_sample$real ==1,3:(ncol(batsL_sample)-1)]
+bgrd <- batsL_sample[,3:(ncol(batsL_sample)-1)]
+
+mean.p <- colMeans(p, na.rm = TRUE)         # estimated mean of presence points
+mean.bgrd <- colMeans(bgrd)   # estimated mean of background points
+sigma.p <- stats::cov(p)             # estimated covariance of presence points
+sigma.bgrd <- stats::cov(bgrd)
+
+batsL[,3:(ncol(batsL_sample)-1)]
+
+require(np)
+f1 <- npudensbw(p, bwmethod='normal-reference')
+f0 <- npudensbw(bgrd, bwmethod='normal-reference')
+  
+f1_fit <- fitted(npudens(bws=f1, edat=batsL[,3:(ncol(batsL_sample)-1)], bwmethod='normal-reference'))
+f0_fit<- fitted(npudens(bws=f0, edat=batsL[,3:(ncol(batsL_sample)-1)], bwmethod='normal-reference'))
+
+S <- f1_fit/f0_fit
+
+batsL$S <- S
+
+AUC_PP_Bats <- roc(data=batsL, response=real, predictor=S)
+plot(AUC_PP_Bats)
+AUC_PP_Bats
+```
+
+```{r}
+#Make long form of just bat intearactions.
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+birdsL <- tidyr::expand(birds, Frugivore_Species, Plant_Species)
+
+#Left_Join in our trait data and denote real entries
+birdsL <-  birds %>% select(., Frugivore_Species, Frug_Mean_Gape_Size, Frug_Body_Mass) %>% unique() %>% left_join(birdsL, ., by="Frugivore_Species")
+birdsL <-  dat %>% select(., Plant_Species, fruit_diameter, fruit_length) %>% unique() %>% left_join(birdsL, ., by="Plant_Species")
+birdsL <- birds %>% select(., Frugivore_Species, Plant_Species) %>% mutate(., real=1) %>% left_join(birdsL, ., by=c("Frugivore_Species", "Plant_Species"))
+birdsL$real[is.na(birdsL$real)==TRUE] <- 0
+
+birdsL %<>% filter(., Frugivore_Species != "Carollia castanea") #wrong gape size
+
+#Sample our overall data
+birdsL_sample <- birdsL[sample(nrow(birdsL)/2, replace=T),]
+
+
+
+p <- birdsL_sample[birdsL_sample$real ==1,3:(ncol(birdsL_sample)-1)]
+bgrd <- birdsL_sample[,3:(ncol(birdsL_sample)-1)]
+
+mean.p <- colMeans(p, na.rm = TRUE)         # estimated mean of presence points
+mean.bgrd <- colMeans(bgrd)   # estimated mean of background points
+sigma.p <- stats::cov(p)             # estimated covariance of presence points
+sigma.bgrd <- stats::cov(bgrd)
+
+birdsL[,3:(ncol(birdsL_sample)-1)]
+
+require(np)
+f1 <- npudensbw(p, bwmethod='normal-reference')
+f0 <- npudensbw(bgrd, bwmethod='normal-reference')
+  
+f1_fit <- fitted(npudens(bws=f1, edat=birdsL[,3:(ncol(birdsL_sample)-1)], bwmethod='normal-reference'))
+f0_fit<- fitted(npudens(bws=f0, edat=birdsL[,3:(ncol(birdsL_sample)-1)], bwmethod='normal-reference'))
+
+S <- f1_fit/f0_fit
+
+birdsL$S <- S
+
+AUC_PP_birds <- roc(data=birdsL, response=real, predictor=S)
+plot(AUC_PP_birds)
+AUC_PP_birds
+```
+
+Alright; now that plug and play works for host and plant traits let's add in phylogeny. 
+
+I set all branch lengths to 1 and then force it back to being ultrametric. This feels like bad juju.
+```{r}
+library(PVR)
+library(ape)
+library(phytools)
+
+plant_tree <- ape::compute.brlen(plant_tree, 1) #set branch lengths to 1
+plant_tree <- phytools::force.ultrametric(plant_tree) #force back to being ultrametric (may be bad)
+plant_litter <- PVR::PVRdecomp(phy=plant_tree, type="newick", scale=TRUE)
+
+round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100 #first three vectors only contain about 28% of variation :(
+
+plant_PhyEig <-data.frame(plant_tree$tip.label, plant_litter@Eigen$vectors[,1:3])
+
+plant_PhyEig %<>% rename(., "Plant_Species"=plant_tree.tip.label)
+plant_PhyEig$Plant_Species <- gsub("_ott.*","", x=plant_PhyEig$Plant_Species)
+plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
+
+dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
+
+frug_tree <- ape::compute.brlen(frug_tree, 1) #set branch lengths to 1
+frug_tree <- phytools::force.ultrametric(frug_tree) #force back to being ultrametric (may be bad)
+frug_litter <- PVR::PVRdecomp(phy=frug_tree, type="newick", scale=TRUE)
+
+round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100 #first three vectors contain about 33.8% of variation
+
+frug_PhyEig <-data.frame(frug_tree$tip.label, frug_litter@Eigen$vectors[,1:3])
+
+frug_PhyEig %<>% rename(., "Frugivore_Species"=frug_tree.tip.label)
+frug_PhyEig$Frugivore_Species <- gsub("_ott.*","", x=frug_PhyEig$Frugivore_Species)
+frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species)
+colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
+
+dat <- left_join(dat, frug_PhyEig, by="Frugivore_Species")
+```
+
+
+
+```{r}
+#Make long form of just bat intearactions.
+bats <- dplyr::filter(dat, Frug_Group=="Bats")
+batsL <- tidyr::expand(bats, Frugivore_Species, Plant_Species)
+
+#Left_Join in our trait data and denote real entries
+batsL <-  bats %>% select(., Frugivore_Species, fc1, fc2, fc3) %>% unique() %>% left_join(batsL, ., by="Frugivore_Species")
+batsL <-  dat %>% select(., Plant_Species, c1, c2, c3) %>% unique() %>% left_join(batsL, ., by="Plant_Species")
+batsL <- bats %>% select(., Frugivore_Species, Plant_Species) %>% mutate(., real=1) %>% left_join(batsL, ., by=c("Frugivore_Species", "Plant_Species"))
+
+batsL$real[is.na(batsL$real)==TRUE] <- 0
+
+batsL %<>% filter(., Frugivore_Species != "Carollia castanea") #wrong gape size
+batsL %<>% filter(., is.na(c1)==FALSE)
+batsL %<>% filter(., is.na(fc1)==FALSE)
+
+#Sample our overall data
+batsL_sample <- batsL[sample(nrow(batsL)/2, replace=T),]
+
+
+p <- batsL_sample[batsL_sample$real ==1,3:(ncol(batsL_sample)-1)]
+bgrd <- batsL_sample[,3:(ncol(batsL_sample)-1)]
+
+mean.p <- colMeans(p, na.rm = TRUE)         # estimated mean of presence points
+mean.bgrd <- colMeans(bgrd)   # estimated mean of background points
+sigma.p <- stats::cov(p)             # estimated covariance of presence points
+sigma.bgrd <- stats::cov(bgrd)
+
+
+require(np)
+f1 <- npudensbw(p, bwmethod='normal-reference')
+f0 <- npudensbw(bgrd, bwmethod='normal-reference')
+  
+f1_fit <- fitted(npudens(bws=f1, edat=batsL[,3:(ncol(batsL_sample)-1)], bwmethod='normal-reference'))
+f0_fit<- fitted(npudens(bws=f0, edat=batsL[,3:(ncol(batsL_sample)-1)], bwmethod='normal-reference'))
+
+S <- f1_fit/f0_fit
+
+batsL$S <- S
+
+AUC_PP_Bats <- roc(data=batsL, response=real, predictor=S)
+plot(AUC_PP_Bats)
+AUC_PP_Bats
+```
+```{r}
+#Make long form of just bat intearactions.
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+birdsL <- tidyr::expand(birds, Frugivore_Species, Plant_Species)
+
+#Left_Join in our trait data and denote real entries
+birdsL <-  birds %>% select(., Frugivore_Species, fc1, fc2, fc3) %>% unique() %>% left_join(birdsL, ., by="Frugivore_Species")
+birdsL <-  dat %>% select(., Plant_Species, c1, c2, c3) %>% unique() %>% left_join(birdsL, ., by="Plant_Species")
+birdsL <- birds %>% select(., Frugivore_Species, Plant_Species) %>% mutate(., real=1) %>% left_join(birdsL, ., by=c("Frugivore_Species", "Plant_Species"))
+
+birdsL$real[is.na(birdsL$real)==TRUE] <- 0
+
+birdsL %<>% filter(., Frugivore_Species != "Carollia castanea") #wrong gape size
+birdsL %<>% filter(., is.na(c1)==FALSE)
+birdsL %<>% filter(., is.na(fc1)==FALSE)
+
+#Sample our overall data
+birdsL_sample <- birdsL[sample(nrow(birdsL)/2, replace=T),]
+
+
+p <- birdsL_sample[birdsL_sample$real ==1,3:(ncol(birdsL_sample)-1)]
+bgrd <- birdsL_sample[,3:(ncol(birdsL_sample)-1)]
+
+mean.p <- colMeans(p, na.rm = TRUE)         # estimated mean of presence points
+mean.bgrd <- colMeans(bgrd)   # estimated mean of background points
+sigma.p <- stats::cov(p)             # estimated covariance of presence points
+sigma.bgrd <- stats::cov(bgrd)
+
+
+require(np)
+f1 <- npudensbw(p, bwmethod='normal-reference')
+f0 <- npudensbw(bgrd, bwmethod='normal-reference')
+  
+f1_fit <- fitted(npudens(bws=f1, edat=birdsL[,3:(ncol(birdsL_sample)-1)], bwmethod='normal-reference'))
+f0_fit<- fitted(npudens(bws=f0, edat=birdsL[,3:(ncol(birdsL_sample)-1)], bwmethod='normal-reference'))
+
+S <- f1_fit/f0_fit
+
+birdsL$S <- S
+
+AUC_PP_birds <- roc(data=birdsL, response=real, predictor=S)
+plot(AUC_PP_birds)
+AUC_PP_birds
+```
+
