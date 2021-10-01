@@ -39,7 +39,7 @@ layout_as_bipartite(web)
 
 ```
 
-```{r}
+```{r eval=FALSE}
 V(web)$type
 V(web)$color <-  NA
 V(web)$color[V(web)$type==TRUE] <- "red"
@@ -129,7 +129,7 @@ plot(test_web, layout=layout_as_bipartite(test_web))
 
 test_adj <- get.adjacency(test_web, type="both", sparse = FALSE)
 
-lattice::levelplot(test_adj)
+#lattice::levelplot(test_adj)
 isSymmetric.matrix(test_adj)
 ```
 
@@ -406,8 +406,8 @@ S <- f1_fit/f0_fit
 
 batsL$S <- S
 
-AUC_PP_Bats <- roc(data=batsL, response=real, predictor=S)
-plot(AUC_PP_Bats)
+AUC_PP_Traits_Bats <- roc(data=batsL, response=real, predictor=S)
+plot(AUC_PP_Traits_Bats)
 AUC_PP_Bats
 ```
 
@@ -444,15 +444,18 @@ f1 <- npudensbw(p, bwmethod='normal-reference')
 f0 <- npudensbw(bgrd, bwmethod='normal-reference')
   
 f1_fit <- fitted(npudens(bws=f1, edat=birdsL[,3:(ncol(birdsL_sample)-1)], bwmethod='normal-reference'))
-f0_fit<- fitted(npudens(bws=f0, edat=birdsL[,3:(ncol(birdsL_sample)-1)], bwmethod='normal-reference'))
+f0_fit <- fitted(npudens(bws=f0, edat=birdsL[,3:(ncol(birdsL_sample)-1)], bwmethod='normal-reference'))
 
 S <- f1_fit/f0_fit
 
-birdsL$S <- S
 
-AUC_PP_birds <- roc(data=birdsL, response=real, predictor=S)
-plot(AUC_PP_birds)
-AUC_PP_birds
+birdsL$S <- S
+birdsL <- birdsL[is.na(birdsL$S)==FALSE,]
+birdsL$S[birdsL$S==Inf] <- max(birdsL$S[birdsL$S!=Inf], na.rm=TRUE)+1
+
+AUC_PP_Traits_birds <- roc(data=birdsL, response=real, predictor=S)
+plot(AUC_PP_Traits_birds)
+AUC_PP_Traits_birds
 ```
 
 Alright; now that plug and play works for host and plant traits let's add in phylogeny. 
@@ -535,9 +538,9 @@ S <- f1_fit/f0_fit
 
 batsL$S <- S
 
-AUC_PP_Bats <- roc(data=batsL, response=real, predictor=S)
-plot(AUC_PP_Bats)
-AUC_PP_Bats
+AUC_PP_Phylo_Bats <- roc(data=batsL, response=real, predictor=S)
+plot(AUC_PP_Phylo_Bats)
+AUC_PP_Phylo_Bats
 ```
 ```{r}
 #Make long form of just bat intearactions.
@@ -579,8 +582,24 @@ S <- f1_fit/f0_fit
 
 birdsL$S <- S
 
-AUC_PP_birds <- roc(data=birdsL, response=real, predictor=S)
-plot(AUC_PP_birds)
-AUC_PP_birds
+AUC_PP_Phylo_birds <- roc(data=birdsL, response=real, predictor=S)
+plot(AUC_PP_Phylo_birds)
+AUC_PP_Phylo_birds
+```
+
+
+```{r}
+pdf(file="PlugPlayTestAUC.pdf", height = 8.5, width=11)
+par(mfrow=c(2,2))
+plot(AUC_PP_Traits_Bats, main="Plug & Play Trait AUC; Bats")
+mtext("AUC=0.7621", side=1)
+plot(AUC_PP_Phylo_Bats, main="Plug & Play PhyloDecomposition AUC; Bats")
+mtext("AUC=0.8211", side=1)
+plot(AUC_PP_Traits_birds, main="Plug & Play Trait AUC; Birds")
+mtext("AUC=0.6782", side=1)
+plot(AUC_PP_Phylo_birds, main="Plug & Play PhyloDecomposition AUC; Birds")
+mtext("AUC=0.6009", side=1)
+
+#Plants: 28%, animals 33.8% of variation  
 ```
 
