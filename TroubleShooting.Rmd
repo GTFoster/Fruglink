@@ -1,0 +1,210 @@
+---
+title: "Plug&Play Troubleshooting"
+author: "Grant Foster"
+date: "10/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Functionalizing Plug n Play
+```{r}
+pp.kde <- function(dat, FrugTraits, PlantTraits){
+  #Set up our data into a fully expanded edgelist
+  require(tidyr)
+  dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
+  dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
+  full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
+  full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
+  full_real$real[is.na(full_real$real)==TRUE] <- 0
+
+  full_real_frugs <- dat[,c("Frugivore_Species", FrugTraits)] %>% unique() %>% left_join(full_real, ., by="Frugivore_Species") #Add in our frugivore traits
+
+  full_real_both <- dat[,c("Plant_Species", PlantTraits)] %>% unique() %>% left_join(full_real_frugs, ., by="Plant_Species") #add in our plant traits
+  
+  # Subsample our edgelist
+  sample_IDs <- sample(round(nrow(full_real_both)*0.8), replace=F) #subsample out 80% of our edges. 
+  test <- full_real_both[-sample_IDs,] #assign 80% train set
+  train <- full_real_both[sample_IDs,]
+
+  #set up our data to go into npudens
+  p <- train[(train[,'real'] == 1), 4:ncol(train)] #positives cases (p)
+  bgrd <- train[,4:ncol(train)] #background (positive and negative) cases
+
+  require(np)
+  f1 <- np::npudens(p, bwmethod='normal-reference') 
+  f0 <- np::npudens(bgrd, bwmethod='normal-reference')
+  model=list(f1, f0, test, train)
+  names(model) <- c("f1", "f0", "test", "train")
+  #browser
+  return(model)
+}
+
+
+predict.pp.kde <- function(model, x){
+  require(np)
+  f1 <- fitted(npudens(bws = model$f1$bws, edat = x, bwmethod = 'normal-reference'))
+  f0 <- fitted(npudens(bws = model$f0$bws, edat = x, bwmethod = 'normal-reference'))
+  #browser()
+  return(S = f1/f0)
+}
+
+
+
+bats_kde <- pp.kde(bats, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugSc1", "FrugSc2", "FrugSc3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipSc1", "LipSc2"))
+
+bats_pred <- predict.pp.kde(model=bats_kde, x=bats_kde$test[,4:ncol(bats_kde$test)])
+bats_kde$test$S <- bats_pred
+
+test_results <- bats_kde$test
+table(is.nan(test_results$S))
+#out %<>% filter(., is.nan(S)==FALSE)
+
+#out$S[is.infinite(out$S)] <- max(out$S[is.infinite(out$S)==FALSE], na.rm = TRUE)+1
+AUC_test <- roc(data=test_results, response=real, predictor=S)
+plot(AUC_test)
+AUC_test
+```
+
+
+
+```{r}
+
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+
+birds_kde <- pp.kde(birds, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipSc1", "LipSc2"))
+
+birds_pred <- predict.pp.kde(model=birds_kde, x=birds_kde$test[,4:ncol(birds_kde$test)])
+birds_kde$test$S <- birds_pred
+
+test_results <- birds_kde$test
+table(is.nan(test_results$S))
+#out %<>% filter(., is.nan(S)==FALSE)
+
+#out$S[is.infinite(out$S)] <- max(out$S[is.infinite(out$S)==FALSE], na.rm = TRUE)+1
+AUC_test <- roc(data=test_results, response=real, predictor=S)
+plot(AUC_test)
+AUC_test
+```
+
+
+### Below here is scratch work on Odd path counting; I'll likely delete later!
+Creating link prediction function
+
+Note: If I make a strictly upper triangular matrix (non-symmetric), it's eigenvalues will all be 0. So we need to see a symmetric matrix. 
+
+We want ideally to minimize the Sigma[f(delta_kk)-U^T * A' * Uk]^2, essentially a sum of squares.
+```{r}
+U <-eigen(mat)$vectors
+L <- eigen(mat)$values
+table(mat)
+table(mat)/sum(table(mat))
+
+
+# A = U*L*U^T
+test <- U %*% diag(L) %*% t(U)
+test <- round(test, digits=3) #Rounding errors make our 0's into super small values
+table(test==mat) #This should be true
+
+#A' = F(A) = U*F(L)*U^T, where F is our kernel function relating our training set (A) to test set (A')
+#We want to minimize |F(A)-A'|, where
+
+U_train <- eigen(test_adj)$vectors
+L_train <- eigen(test_adj)$values
+
+target_V <- t(U_train) %*% mat %*% U_train
+target_V <- diag(target_V)
+
+plot(x=L_train, y=target_V, col="dodger blue", pch=16)
+```
+
+
+The first kernel that we use is odd path counting. Here we look at weighted sum of several odd powers of the original adjacency matrix (recall that k-th power of an adjacency matrix refers to numbers of k-hop neighbours from every node). The higher the value, the more likely it is for two vertices to be connected.
+
+I think this is mostly wrong. I hope to fix it in the future.
+
+```{r}
+library(expm)
+
+odd_kernal <- function(input, max_path){
+  index <- seq(from=1, to=max_path, by=2)
+  #index <- index[-1]
+  output <- 0
+  for(i in index){
+    #print(i)
+    output <- output + (test_adj %^% i)
+  }
+  return(output)
+}
+
+odd_paths_V1 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 1) %*% U_train
+odd_paths_pred1 <- diag(odd_paths_V1)
+
+odd_paths_V3 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 3) %*% U_train
+odd_paths_pred3 <- diag(odd_paths_V3)
+
+odd_paths_V5 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 5) %*% U_train
+odd_paths_pred5 <- diag(odd_paths_V5)
+
+odd_paths_V7 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 7) %*% U_train
+odd_paths_pred7 <- diag(odd_paths_V7)
+
+odd_paths_V9 <- t(U_train) %*% odd_kernal(input=test_adj, max_path = 9) %*% U_train
+odd_paths_pred9 <- diag(odd_paths_V9)
+
+plot(x=L_train, y=target_V, col="dodger blue", pch=16)
+points(x=L_train, y=odd_paths_pred1, col="red", pch=16)
+points(x=L_train, y=odd_paths_pred3, col="orange", pch=16)
+points(x=L_train, y=odd_paths_pred5, col="green", pch=16)
+points(x=L_train, y=odd_paths_pred7, col="purple", pch=16)
+points(x=L_train, y=odd_paths_pred9, col="navy", pch=16)
+legend(1, 1, legend=c("1 (base)", "3", "5", "7", "9"),
+       col=c("red", "orange", "green", "purple", "navy"), pch=16, cex=0.8)
+
+all.equal(dim(odd_paths_V1), dim(mat))
+
+edgelist <- data.frame(matrix(mat, dimnames=list(t(outer(colnames(mat), rownames(mat), FUN=paste)), NULL)))
+colnames(edgelist) <- "truth"
+edgelist <- rownames_to_column(edgelist, var="link")
+
+
+colnames(odd_paths_V1) <- colnames(mat)
+rownames(odd_paths_V1) <- rownames(mat)
+odd_paths_1L <- data.frame(matrix(odd_paths_V1, dimnames=list(t(outer(colnames(odd_paths_V1), rownames(odd_paths_V1), FUN=paste)), NULL)))
+colnames(odd_paths_1L) <- "Path1"
+odd_paths_1L <- rownames_to_column(odd_paths_1L, var="link")
+
+colnames(odd_paths_V3) <- colnames(mat)
+rownames(odd_paths_V3) <- rownames(mat)
+odd_paths_3L <- data.frame(matrix(odd_paths_V3, dimnames=list(t(outer(colnames(odd_paths_V3), rownames(odd_paths_V3), FUN=paste)), NULL)))
+colnames(odd_paths_3L) <- "Path3"
+odd_paths_3L <- rownames_to_column(odd_paths_3L, var="link")
+
+ROC_data <- left_join(edgelist, odd_paths_1L, by="link")
+ROC_data <- left_join(ROC_data, odd_paths_3L, by="link")
+
+simple_roc <- function(labels, scores){
+  labels <- labels[order(scores, decreasing=TRUE)]
+  data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
+}
+
+temp <- simple_roc(labels=ROC_data$truth, scores=ROC_data$Path1)
+temp2 <- simple_roc(labels=ROC_data$truth, scores=ROC_data$Path3)
+plot(x=temp$FPR, y=temp$TPR, type="l", col="blue")
+lines(x=temp2$FPR, y=temp2$TPR, type="l", col="red")
+
+
+AUC_Odd1 <- roc(response=ROC_data$truth, predictor=ROC_data$Path1)
+AUC_Odd3 <- roc(response=ROC_data$truth, predictor=ROC_data$Path3)
+
+auc(AUC_Odd1)
+plot(AUC_Odd1)
+
+auc(AUC_Odd3)
+plot(AUC_Odd3)
+```
+
+  
+
