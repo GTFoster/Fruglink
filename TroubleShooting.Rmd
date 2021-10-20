@@ -207,4 +207,65 @@ plot(AUC_Odd3)
 ```
 
   
+  
+
+Beta*sinh(alpha*A)
+
+
+alpha * (np.exp(lamb) - np.exp(-lamb)) for lamb in V
+x=v_train
+y=target_V
+
+y = function(x) + eps
+V_train
+
+
+
+
+```{r}
+rgraph <-bipartite.random.game(15, 10, type="gnm", m=50)
+
+rgraph$type <- layout_as_bipartite(rgraph)
+plot(rgraph, layout=layout_as_bipartite(rgraph))
+
+train_Edges <- sample(1:length(E(rgraph)), round(length(E(rgraph))*0.7), replace = FALSE)
+
+
+test <- igraph::delete.edges(rgraph, train_Edges)
+
+
+x <- x[x %in% train_Edges ==FALSE]
+train <- igraph::delete.edges(rgraph, x)
+
+plot(train, layout=layout_as_bipartite(train))
+plot(test, layout=layout_as_bipartite(test))
+
+```
+
+
+```{r}
+alphas <- seq(from=-1, to=1, by=0.1)
+
+result <- NULL
+for(i in 1:length(alphas)){
+temp <- alphas[i]*(expm::expm(diag(L))) - expm::expm(diag(L))
+result[i] <- sum((temp-U_train)^2)
+}
+
+alphas[which.min(result)]
+result
+
+test_A <- get.adjacency(test, sparse=FALSE)
+train_A <- get.adjacency(train, sparse=FALSE)
+?get.adjacency
+z <- eigen(train_A)
+
+target <- vector()
+for(i in 1:ncol(test_A)){
+target[i] <- t(eigen(train_A)$vector)[i,] %*% test_A %*% eigen(train_A)$vector[,i] #UkTA'Uk
+}
+
+
+plot(x=eigen(train_A)$values, y=target)
+```
 

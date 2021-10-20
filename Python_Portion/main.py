@@ -4,6 +4,7 @@ import numpy as np
 #import scipy as sc
 import matplotlib.pyplot as plt
 
+#import scipy.optimize
 from sklearn import metrics
 from scipy.optimize import curve_fit
 from tqdm import tqdm
@@ -149,10 +150,10 @@ class SinhPseudokernel:
     def __init__(self):
         self.alpha = 0
 
-    def func(self, V, alpha):
-        return np.array([
-            alpha * (np.exp(lamb) - np.exp(-lamb)) for lamb in V
-        ])
+        def func(self, V, alpha):
+            return np.array([
+                alpha * (np.exp(lamb) - np.exp(-lamb)) for lamb in V
+            ])
 
     def fit(self, V_train, target_V):
         # do curve fitting
@@ -214,4 +215,3 @@ for kernel in [OddPathCountingKernel(), SinhPseudokernel(), OddNeumannPseudokern
     # evaluate MAP and precision
     ROC_PRC(pred, G)
     MAP(G_test, G_pred)
-

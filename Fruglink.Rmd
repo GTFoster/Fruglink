@@ -130,7 +130,10 @@ Bird_List[Bird_List %in% Bird_trees$tree_2110$tip.label==FALSE] #mammals not in 
 
 
 ```{r plot our trees, eval=FALSE}
+Mammal_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugMam/output.nex")
+Bird_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugBird/output.nex")
 #pdf(file="Phylogenies.pdf", height=11, width=8.5)
+
 par(mfrow = c(3, 2))
 ape::plot.phylo(BIEN_subtree, show.tip.label = FALSE, type="fan", show.node.label = FALSE, main="Plants")
 plot(BIEN_subtree, show.tip.label=FALSE)
@@ -198,9 +201,9 @@ Since we have one tree for the plant species, I just do a singular decomposition
 ```{r add plant phylogeny to dat}
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-#round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100 #first three vectors only contain about 28% of variation :(
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:5]) #first three vectors only contain about 28% of variation :(
 
-plant_PhyEig <-data.frame(plant_tree$tip.label, plant_litter@Eigen$vectors[,1:5])
+plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
 colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
 
 plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
@@ -306,7 +309,7 @@ AUC_BatsTraits
 ```{r Setup bat phylogeny}
 frug_litter <- PVR::PVRdecomp(phy=Mammal_trees[[1]], type="newick", scale=TRUE)
 
-#round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100 #first three vectors contain 66.4% of variation!!!
+#sum((round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100)[1:3]) #first three vectors contain 66.4% of variation!!!
 frug_PhyEig <-data.frame(Mammal_trees[[1]]$tip.label, frug_litter@Eigen$vectors[,1:4]) #take first three vectors and make them a dataframe
 colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3", "fc4")
 
@@ -350,7 +353,7 @@ AUC_birdsTraits
 ```{r Setup Bird phylogeny}
 frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[5]], type="newick", scale=TRUE)
 
-round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100 #first three vectors contain 47% of variation
+sum((round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100)[1:3]) #first three vectors contain 47% of variation
 frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
 colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
 
@@ -384,3 +387,59 @@ mtext(paste("AUC", round(AUC_birdsTraits$auc, 3), sep="="), side=1)
 plot(AUC_BirdsPhylo, main="Plug & Play PhyloDecomposition AUC; Birds")
 mtext(paste("AUC", round(AUC_BirdsPhylo$auc, 3), sep="="), side=1)
 ```
+Latent Link Prediction Methods
+
+Tad's Method
+  locSim <- rowMeans(as.matrix(vegan::vegdist(intMat)))	
+  pathSim <- rowMeans(as.matrix(vegan::vegdist(t(intMat))))
+  simMat <- locSim %*% t(pathSim)	
+```{r}
+
+mat_assym <- as.data.frame.matrix(table(dat$Frugivore_Species, dat$Plant_Species)) #Rows = Frugivores, Columns = Plants
+frugSim <- rowMeans(as.matrix(vegan::vegdist(mat_assym)))	
+plantSim <- rowMeans(as.matrix(vegan::vegdist(t(mat_assym))))
+simMat <- frugSim %*% t(plantSim)	
+
+data.frame(host = rownames(mat_assym), frugSim)
+df$similarity <- as.vector(simMat)
+```
+
+```{r}
+  bats$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
+  full_L <- tidyr::expand(bats, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
+  full_real <- dplyr::select(bats, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
+  full_real$real[is.na(full_real$real)==TRUE] <- 0
+  full_real %<>% unique(.)
+  
+  mat_assym <- pivot_wider(full_real, names_from = Plant_Species, values_from = real)
+  mat_assym %<>% column_to_rownames(., var="Frugivore_Species")
+  
+  frugSim <- rowMeans(as.matrix(vegan::vegdist(mat_assym)))	
+  plantSim <- rowMeans(as.matrix(vegan::vegdist(t(mat_assym))))
+  simMat <- frugSim %*% t(plantSim)	
+
+  full_real$similarity <- as.vector(simMat)
+
+  # Subsample our edgelist
+  sample_IDs <- sample(round(nrow(full_real)*0.8), replace=F) #subsample out 80% of our edges. 
+  test <- full_real[-sample_IDs,] #assign 80% train set
+  train <- full_real[sample_IDs,]
+
+  #set up our data to go into npudens
+  p <- train[(train[,'real'] == 1), 4:ncol(train)] #positives cases (p)
+  bgrd <- train[,4:ncol(train)] #background (positive and negative) cases
+
+  require(np)
+  f1 <- np::npudens(p, bwmethod='normal-reference') 
+  f0 <- np::npudens(bgrd, bwmethod='normal-reference')
+  model=list(f1, f0, test, train)
+  names(model) <- c("f1", "f0", "test", "train")
+  #browser
+  
+model$test$S <- predict.pp.kde(model=model, x=model$test[,4:ncol(model$test)]) #Predict on test set and assign suitability scores
+
+AUC_BatsLatent <- roc(data=model$test, response=real, predictor=S)
+plot(AUC_BatsLatent, main="vegdist latent: Bats")
+AUC_BatsLatent
+```
+
