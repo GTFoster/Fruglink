@@ -394,52 +394,187 @@ Tad's Method
   pathSim <- rowMeans(as.matrix(vegan::vegdist(t(intMat))))
   simMat <- locSim %*% t(pathSim)	
 ```{r}
-
+vegstuff <- function(dat){
 mat_assym <- as.data.frame.matrix(table(dat$Frugivore_Species, dat$Plant_Species)) #Rows = Frugivores, Columns = Plants
-frugSim <- rowMeans(as.matrix(vegan::vegdist(mat_assym)))	
-plantSim <- rowMeans(as.matrix(vegan::vegdist(t(mat_assym))))
-simMat <- frugSim %*% t(plantSim)	
+frugSim <- rowMeans(as.matrix(vegan::vegdist(mat_assym)))	 #What's my average distance from all other frugivores (higher means I'm more unique, lower means I'm more similiar)
+plantSim <- rowMeans(as.matrix(vegan::vegdist(t(mat_assym)))) #Same thing for plants
+simMat <- frugSim %*% t(plantSim)	#uniqueness of the plant * uniqueness of the frugivore
+rownames(simMat) <- rownames(mat_assym)
+data.frame(frugSim) %>% rownames_to_column("Frugivore_Species")
 
-data.frame(host = rownames(mat_assym), frugSim)
-df$similarity <- as.vector(simMat)
+dat <- data.frame(frugSim) %>% rownames_to_column("Frugivore_Species") %>% left_join(dat, by="Frugivore_Species")
+dat_new <- data.frame(plantSim) %>% rownames_to_column("Plant_Species") %>% left_join(dat, by="Plant_Species")
+return(dat_new)
+}
+
+dat <- vegstuff(dat)
 ```
 
+
 ```{r}
-  bats$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
-  full_L <- tidyr::expand(bats, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
-  full_real <- dplyr::select(bats, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
+bats <- dplyr::filter(dat, Frug_Group=="Bats") %>% dplyr::select(., -frugSim, -plantSim)
+bats <- vegstuff(bats)
+
+bats_vegdist_kde <- pp.kde(bats, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
+#Predictors include continuous variables plus plant form and lipid score
+bats_vegdist_kde$test$S <- predict.pp.kde(model=bats_vegdist_kde, x=bats_vegdist_kde$test[,4:ncol(bats_vegdist_kde$test)]) #Predict on test set and assign suitability scores
+
+AUC_BatsVegdist <- roc(data=bats_vegdist_kde$test, response=real, predictor=S)
+plot(AUC_BatsVegdist)
+AUC_BatsVegdist
+```
+
+Woah, this actually works super well with birds!
+```{r}
+birds <- dplyr::filter(dat, Frug_Class=="Aves") %>% dplyr::select(., -frugSim, -plantSim)
+birds <- vegstuff(birds)
+
+birds_vegdist_kde <- pp.kde(birds, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
+#Predictors include continuous variables plus plant form and lipid score
+birds_vegdist_kde$test$S <- predict.pp.kde(model=birds_vegdist_kde, x=birds_vegdist_kde$test[,4:ncol(birds_vegdist_kde$test)]) #Predict on test set and assign suitability scores
+
+AUC_birdsVegdist <- roc(data=birds_vegdist_kde$test, response=real, predictor=S)
+plot(AUC_birdsVegdist)
+AUC_birdsVegdist
+```
+
+
+
+
+
+full data
+```{r}
+
+full_vegdist_kde <- pp.kde(dat, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
+#Predictors include continuous variables plus plant form and lipid score
+full_vegdist_kde$test$S <- predict.pp.kde(model=full_vegdist_kde, x=full_vegdist_kde$test[,4:ncol(full_vegdist_kde$test)]) #Predict on test set and assign suitability scores
+
+AUC_fullVegdist <- roc(data=full_vegdist_kde$test, response=real, predictor=S)
+plot(AUC_fullVegdist)
+AUC_fullVegdist
+```
+
+
+```{r}
+#pdf(file="PlugPlayVegDistAUC.pdf", height = 11, width=8.5)
+par(mfrow=c(3,1))
+plot(AUC_birdsVegdist, main="Plug & Play Vegdist AUC; Full")
+mtext(paste("AUC", round(AUC_birdsVegdist$auc, 3), sep="="), side=1)
+plot(AUC_fullVegdist, main="Plug & Play Vegdist AUC; Birds")
+mtext(paste("AUC", round(AUC_fullVegdist$auc, 3), sep="="), side=1)
+plot(AUC_BatsVegdist, main="Plug & Play Vegdist AUC; Bats")
+mtext(paste("AUC", round(AUC_BatsVegdist$auc, 3), sep="="), side=1)
+```
+
+
+
+
+I've also set up some of the spectral decomposition stuff in another .rmd in the repository.
+
+Now, let's try some random forest models. 
+
+
+desmos::evaluate()
+```{r}
+woodedWalk <- function(dat, FrugTraits, PlantTraits){
+  #Set up our data into a fully expanded edgelist
+  require(tidyr)
+  dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
+  dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
+  full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
+  full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
   full_real$real[is.na(full_real$real)==TRUE] <- 0
-  full_real %<>% unique(.)
-  
-  mat_assym <- pivot_wider(full_real, names_from = Plant_Species, values_from = real)
-  mat_assym %<>% column_to_rownames(., var="Frugivore_Species")
-  
-  frugSim <- rowMeans(as.matrix(vegan::vegdist(mat_assym)))	
-  plantSim <- rowMeans(as.matrix(vegan::vegdist(t(mat_assym))))
-  simMat <- frugSim %*% t(plantSim)	
 
-  full_real$similarity <- as.vector(simMat)
+  full_real_frugs <- dat[,c("Frugivore_Species", FrugTraits)] %>% unique() %>% left_join(full_real, ., by="Frugivore_Species") #Add in our frugivore traits
 
+  full_real_both <- dat[,c("Plant_Species", PlantTraits)] %>% unique() %>% left_join(full_real_frugs, ., by="Plant_Species") #add in our plant traits
+  
+  full_real_both$real <- as.factor(full_real_both$real)
+  
   # Subsample our edgelist
-  sample_IDs <- sample(round(nrow(full_real)*0.8), replace=F) #subsample out 80% of our edges. 
-  test <- full_real[-sample_IDs,] #assign 80% train set
-  train <- full_real[sample_IDs,]
-
-  #set up our data to go into npudens
-  p <- train[(train[,'real'] == 1), 4:ncol(train)] #positives cases (p)
-  bgrd <- train[,4:ncol(train)] #background (positive and negative) cases
-
-  require(np)
-  f1 <- np::npudens(p, bwmethod='normal-reference') 
-  f0 <- np::npudens(bgrd, bwmethod='normal-reference')
-  model=list(f1, f0, test, train)
-  names(model) <- c("f1", "f0", "test", "train")
-  #browser
+  sample_IDs <- sample(round(nrow(full_real_both)*0.8), replace=F) #subsample out 80% of our edges. 
+  test <- full_real_both[-sample_IDs,] #assign 80% train set
+  train <- full_real_both[sample_IDs,]
   
-model$test$S <- predict.pp.kde(model=model, x=model$test[,4:ncol(model$test)]) #Predict on test set and assign suitability scores
 
-AUC_BatsLatent <- roc(data=model$test, response=real, predictor=S)
-plot(AUC_BatsLatent, main="vegdist latent: Bats")
-AUC_BatsLatent
+  rf<-randomForest::randomForest(real ~. -Frugivore_Species - Plant_Species, data=train, ntree=100)
+  trainROC <- roc(train$real,rf$votes[,2])
+  predictions <- stats::predict(rf, newdata=test, type="prob")
+  test$S <- predictions[,2]
+  
+  model=list(rfModel=rf,test=test, train=train)
+  return(model)
+}
+
+```
+
+## Apply Random forest to Bats
+
+Traits - Bats
+```{r PnP on Bat Traits}
+bats <- dplyr::filter(dat, Frug_Group=="Bats")
+
+bats_rf_traits <- woodedWalk(bats, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2"))
+#Predictors include continuous variables plus plant form and lipid score
+
+AUC_RF_BatsTraits <- roc(data=bats_rf$test, response=real, predictor=S)
+plot(AUC_RF_BatsTraits)
+AUC_RF_BatsTraits
+```
+Bats - Phylogeny
+```{r}
+bats_rf_plylo <- woodedWalk(bats_temp, FrugTraits = c("fc1", "fc2", "fc3", "fc4"), PlantTraits = c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp"))
+
+AUC_RF_BatsPhylo <- roc(data=bats_rf_plylo$test, response=real, predictor=S)
+plot(AUC_RF_BatsPhylo)
+AUC_RF_BatsPhylo
+```
+
+
+
+### Apply Random Forest to Birds
+
+## Traits - Birds
+
+```{r PnP on Bird Traits}
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+
+birds_rf_traits <- woodedWalk(birds, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3"))#Predictors include continuous variables plus plant form and lipid score
+
+
+AUC_RF_BirdsTraits <- roc(data=birds_rf_traits$test, response=real, predictor=S)
+plot(AUC_RF_BirdsTraits)
+AUC_RF_BirdsTraits
+```
+## Phylogeny - Birds
+  
+Run it
+```{r PnP on Bird Phylogeny}
+birds_rf_plylo <- woodedWalk(birds_temp, FrugTraits = c("fc1", "fc2", "fc3"), PlantTraits = c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp"))
+#Predictors include continuous variables plus plant form and lipid score
+
+AUC_RF_BirdsPhylo <- roc(data=birds_rf_plylo$test, response=real, predictor=S)
+plot(AUC_RF_BirdsPhylo)
+AUC_RF_BirdsPhylo
+```
+
+
+
+
+```{r}
+hist(degree_distribution(batweb))
+degree_distribution(batweb)
+
+hist(degree(batweb))
+hist(degree(birdweb))
+hist(degree(web))
+max(degree(web))
+
+bats %>% select(., Plant_Species, Frugivore_Species) %>% unique()
+
+x <- degree(web)
+which.max(x)
+
+hist(degree(web)[degree(web)!=1])
 ```
 
