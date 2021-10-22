@@ -25,14 +25,16 @@ library(phytools)
 ```{r read in data}
 dat <- read.csv("Data.nosync/ATLANTIC_frugivory.csv")
 dat %<>% filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size
+dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
+
+dat %<>% unique(.)
 ```
 
 ```{r set up igraph network}
 
-uniq <- dat %>% select(., Frugivore_Species, Plant_Species) %>% unique()
 web <- data.frame(
-    from = uniq$Frugivore_Species,
-    to = uniq$Plant_Species
+    from = dat$Frugivore_Species,
+    to = dat$Plant_Species
   ) %>% graph_from_data_frame(directed=FALSE) #Create a graph with all unique plant-frugivore edges
 
 mat <-get.adjacency(web, type="both", sparse = FALSE) #Create adjacency matrix from our newly created web
@@ -94,7 +96,7 @@ BIEN_tree$tip.label
 BIEN_matches <- plant_list[plant_list %in% BIEN_tree$tip.label==TRUE]
 
 BIEN_subtree <- ape::keep.tip(BIEN_tree, tip=BIEN_matches)
-pdf(file="BIEN_planttree.pdf")
+#pdf(file="BIEN_planttree.pdf")
 plot(BIEN_subtree, show.tip.label=FALSE)
 ```
 
@@ -112,7 +114,7 @@ clipr::write_clip(Mammal_List[,1]) #This way we can copy our species into the Ve
 clipr::write_clip(Bird_List[,1])
 ```
 
-```{r read and match vertTrees, eval=TRUE}
+```{r read and match vertTrees, eval=FALSE}
 Mammal_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugMam/output.nex")
 
 plot(Mammal_trees[1], show.tip.label = FALSE)
@@ -129,9 +131,12 @@ Bird_List[Bird_List %in% Bird_trees$tree_2110$tip.label==FALSE] #mammals not in 
 ```
 
 
-```{r plot our trees, eval=FALSE}
+```{r load trees, eval=TRUE}
 Mammal_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugMam/output.nex")
 Bird_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugBird/output.nex")
+```
+
+```{plot our trees, eval=FALSE}
 #pdf(file="Phylogenies.pdf", height=11, width=8.5)
 
 par(mfrow = c(3, 2))
@@ -188,8 +193,11 @@ dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Lipid_Score, values
 dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Fruit_color, values_from = bin)
 dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Plant_origin, values_from = bin)
 
-dat[, 32:ncol(dat)][is.na(dat[,32:ncol(dat)])==TRUE] <- 0 #Replae all NA's in our newly created columns with 0
 
+
+dat[, which(colnames(dat)=="liana"):ncol(dat)][is.na(dat[,which(colnames(dat)=="liana"):ncol(dat)])==TRUE] <- 0 #Replae all NA's in our newly created columns with 0
+
+colnames(dat)[32]
 dat <- left_join(dat, dat_old) #add back in our factor columns just in case we want them later
 ```
 
@@ -212,7 +220,7 @@ dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
 ```
 
 Frugivore trees-I'm doing this dumb
-```{r}
+```{r eval=FALSE}
 frug_tree <- ape::compute.brlen(frug_tree, 1) #set branch lengths to 1
 frug_tree <- phytools::force.ultrametric(frug_tree) #force back to being ultrametric (may be bad)
 frug_litter <- PVR::PVRdecomp(phy=frug_tree, type="newick", scale=TRUE)
@@ -288,20 +296,28 @@ predict.pp.kde <- function(model, x){
 }
 ```
 
+Now that we're set up for success, let's create our subsets
+```{r}
+bats <- dplyr::filter(dat, Frug_Group=="Bats")
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+```
 # Apply Plug and Play to Bats
-
 ## Traits - Bats
 ```{r PnP on Bat Traits}
-bats <- dplyr::filter(dat, Frug_Group=="Bats")
-
-bats_kde <- pp.kde(bats, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2"))
+bats_kde <- pp.kde(bats, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green"))
 #Predictors include continuous variables plus plant form and lipid score
-
+table(bats$palm)
 bats_kde$test$S <- predict.pp.kde(model=bats_kde, x=bats_kde$test[,4:ncol(bats_kde$test)]) #Predict on test set and assign suitability scores
 
 AUC_BatsTraits <- roc(data=bats_kde$test, response=real, predictor=S)
 plot(AUC_BatsTraits)
 AUC_BatsTraits
+
+FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+
+FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green")
+
+apply(bats, MARGIN=2, table)
 ```
   
 ## Phylogeny - Bats
@@ -338,8 +354,6 @@ AUC_BatsPhylo
 ## Traits - Birds
 This takes a bit (~5min or so on my machine)
 ```{r PnP on Bird Traits}
-birds <- dplyr::filter(dat, Frug_Class=="Aves")
-
 birds_kde <- pp.kde(birds, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3"))#Predictors include continuous variables plus plant form and lipid score
 
 birds_kde$test$S <- predict.pp.kde(model=birds_kde, x=birds_kde$test[,4:ncol(birds_kde$test)]) #Predict on test set and assign suitability scores
@@ -512,12 +526,10 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits){
 
 Traits - Bats
 ```{r PnP on Bat Traits}
-bats <- dplyr::filter(dat, Frug_Group=="Bats")
-
 bats_rf_traits <- woodedWalk(bats, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2"))
 #Predictors include continuous variables plus plant form and lipid score
 
-AUC_RF_BatsTraits <- roc(data=bats_rf$test, response=real, predictor=S)
+AUC_RF_BatsTraits <- roc(data=bats_rf_traits$test, response=real, predictor=S)
 plot(AUC_RF_BatsTraits)
 AUC_RF_BatsTraits
 ```
@@ -537,8 +549,6 @@ AUC_RF_BatsPhylo
 ## Traits - Birds
 
 ```{r PnP on Bird Traits}
-birds <- dplyr::filter(dat, Frug_Class=="Aves")
-
 birds_rf_traits <- woodedWalk(birds, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3"))#Predictors include continuous variables plus plant form and lipid score
 
 
@@ -557,9 +567,63 @@ AUC_RF_BirdsPhylo <- roc(data=birds_rf_plylo$test, response=real, predictor=S)
 plot(AUC_RF_BirdsPhylo)
 AUC_RF_BirdsPhylo
 ```
+## Latent: Random Forest
+
+```{r}
+birds_rf_vegdist <- woodedWalk(birds, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
+
+AUC_RF_BirdsVegdist <- roc(data=birds_rf_vegdist$test, response=real, predictor=S)
+plot(AUC_RF_BirdsVegdist)
+AUC_RF_BirdsVegdist
+
+bats_rf_vegdist <- woodedWalk(bats, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
+
+AUC_RF_BatsVegdist <- roc(data=bats_rf_vegdist$test, response=real, predictor=S)
+plot(AUC_RF_BatsVegdist)
+AUC_RF_BatsVegdist
+```
+
+
+Birds Random Forest vs PPE
+```{r}
+#pdf(file = "Birds_PPEvsRF.pdf", height = 11, width=8.5)
+par(mfrow=c(3,2))
+plot(AUC_birdsTraits, main="Plug & Play Traits ROC; Birds")
+mtext(paste("AUC", round(AUC_birdsTraits$auc, 3), sep="="), side=1)
+plot(AUC_RF_BirdsTraits, main="Random Forest Traits ROC; Birds")
+mtext(paste("AUC", round(AUC_RF_BirdsTraits$auc, 3), sep="="), side=1)
+plot(AUC_BirdsPhylo, main="Plug & Play Phylo ROC; Birds")
+mtext(paste("AUC", round(AUC_BirdsPhylo$auc, 3), sep="="), side=1)
+plot(AUC_RF_BirdsPhylo, main="Random Forest Phylo ROC; Birds")
+mtext(paste("AUC", round(AUC_RF_BirdsPhylo$auc, 3), sep="="), side=1)
+plot(AUC_birdsVegdist, main="Plug & Play Vegdist(Latent) ROC; Birds")
+mtext(paste("AUC", round(AUC_birdsVegdist$auc, 3), sep="="), side=1)
+plot(AUC_RF_BirdsVegdist, main="Random Forest Vegdist(Latent) ROC; Birds")
+mtext(paste("AUC", round(AUC_RF_BirdsVegdist$auc, 3), sep="="), side=1)
+```
+
+Bats Random Forest vs PPE
+```{r}
+#pdf(file = "Bats_PPEvsRF.pdf", height = 11, width=8.5)
+par(mfrow=c(3,2))
+plot(AUC_BatsTraits, main="Plug & Play Traits ROC; Bats")
+mtext(paste("AUC", round(AUC_BatsTraits$auc, 3), sep="="), side=1)
+plot(AUC_RF_BatsTraits, main="Random Forest Traits ROC; Bats")
+mtext(paste("AUC", round(AUC_RF_BatsTraits$auc, 3), sep="="), side=1)
+plot(AUC_BatsPhylo, main="Plug & Play Phylo ROC; Bats")
+mtext(paste("AUC", round(AUC_BatsPhylo$auc, 3), sep="="), side=1)
+plot(AUC_RF_BatsPhylo, main="Random Forest Phylo ROC; Bats")
+mtext(paste("AUC", round(AUC_RF_BatsPhylo$auc, 3), sep="="), side=1)
+plot(AUC_BatsVegdist, main="Plug & Play Vegdist(Latent) ROC; Bats")
+mtext(paste("AUC", round(AUC_BatsVegdist$auc, 3), sep="="), side=1)
+plot(AUC_RF_BatsVegdist, main="Random Forest Vegdist(Latent) ROC; Bats")
+mtext(paste("AUC", round(AUC_RF_BatsVegdist$auc, 3), sep="="), side=1)
+```
 
 
 
+
+Looking at some network summary stats
 
 ```{r}
 hist(degree_distribution(batweb))
