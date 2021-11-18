@@ -1,0 +1,53 @@
+---
+title: "Parallelized_Node2Vec"
+author: "Grant Foster"
+date: "11/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(node2vec)
+library(parallel)
+library(tictoc)
+library(dplyr)
+```
+
+
+```{r}
+bats <- dplyr::filter(dat, Frug_Group=="Bats")
+save(bats, file="bats.rda")
+```
+
+Actually doing the node2vec output
+```{r}
+tic()
+poutput <- list()
+for(p in 1:length(seq(0.1, 1.9, by=0.1))){
+  qoutput <- list()
+  for(q in 1:length(seq(0.1, 1.9, by=0.1))){
+      node2vecOutput <- bats %>% select(., Frug_Epitetus, Plant_specific.epiteth) %>% unique() %>% data.frame() %>%   node2vecR(data=., p=p,q=seq(0.1, 1.9, by=0.1)[q], num_walks=10,walk_length=10,dim=3) #Run Node2Vec
+      batstemp <- bats #reset batstemp
+      batstemp <- node2vecOutput %>% data.frame() %>% rownames_to_column(., var="Frug_Epitetus") %>% rename(., frugX1=X1, frugX2=X2, frugX3=X3) %>% left_join(batstemp, ., by="Frug_Epitetus") #Add in frugivore node2vec values
+      batstemp <- node2vecOutput %>% data.frame() %>% rownames_to_column(., var="Plant_specific.epiteth") %>% rename(., plantX1=X1, plantX2=X2, plantX3=X3) %>% left_join(batstemp, ., by="Plant_specific.epiteth") #Add in plant node2vec values
+      
+    bats_rf_node2vec <- woodedWalk(batstemp, FrugTraits = c("frugX1","frugX2", "frugX3"), PlantTraits = c("plantX1", "plantX2", "plantX3")) #Run random forest model on node2vec outputs
+    AUC_bats_rf_node2vec <- roc(data=bats_rf_node2vec$test, response=real, predictor=S)
+    
+    qoutput[[q]] <- AUC_bats_rf_node2vec #Save the q output in a list
+    qoutput[[q]]$paramslong <- c(paste("q=", seq(0.1, 1.9, by=0.1)[q], sep=""), paste("p=", seq(0.1, 1.9, by=0.1)[p], sep="")) #Save our Node2Vec search paramaters in the list sub-element
+    qoutput[[q]]$params <- c(seq(0.1, 1.9, by=0.1)[p], seq(0.1, 1.9, by=0.1)[q])
+    }
+  
+  poutput[[p]] <- qoutput #Now we have a list of all q values for a given p value; save it as an element of a bigger list
+}
+
+time <- toc()
+
+time
+save(poutput, time, file="N2Vec_Bats_Coarse.rda")
+```

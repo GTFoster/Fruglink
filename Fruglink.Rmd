@@ -91,8 +91,9 @@ plant_list <- unique(dat$Plant_Species)
 plant_list <- gsub(" ","_", plant_list)
 
 BIEN_tree <- BIEN_phylogeny_complete(n_phylogenies = 1, seed=1, replicates = 1)
-BIEN_tree$tip.label
+length(BIEN_tree$tip.label)
 
+length(BIEN_matches)
 BIEN_matches <- plant_list[plant_list %in% BIEN_tree$tip.label==TRUE]
 
 BIEN_subtree <- ape::keep.tip(BIEN_tree, tip=BIEN_matches)
@@ -121,6 +122,7 @@ plot(Mammal_trees[1], show.tip.label = FALSE)
 
 Mammal_List <- gsub(" ", "_", Mammal_List[,1])
 Mammal_List[Mammal_List %in% Mammal_trees$tree_1642$tip.label==FALSE] #mammals not in our phylogeny
+length(Mammal_List)
 
 Bird_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugBird/output.nex")
 
@@ -128,6 +130,9 @@ plot(Bird_trees[1], show.tip.label = FALSE)
 
 Bird_List <- gsub(" ", "_", Bird_List[,1])
 Bird_List[Bird_List %in% Bird_trees$tree_2110$tip.label==FALSE] #mammals not in our phylogeny
+length(Bird_List)
+length(Bird_List[Bird_List %in% Bird_trees$tree_2110$tip.label==FALSE])
+242-10
 ```
 
 
@@ -619,6 +624,83 @@ mtext(paste("AUC", round(AUC_BatsVegdist$auc, 3), sep="="), side=1)
 plot(AUC_RF_BatsVegdist, main="Random Forest Vegdist(Latent) ROC; Bats")
 mtext(paste("AUC", round(AUC_RF_BatsVegdist$auc, 3), sep="="), side=1)
 ```
+
+
+Node2Vec
+```{r}
+library(node2vec)
+library(tictoc)
+tic()
+node2vecOutput <- dat %>% select(., Frug_Epitetus, Plant_specific.epiteth) %>% data.frame() %>% node2vecR(data=., p=1,q=1, num_walks=10,walk_length=10,dim=10)
+toc()
+
+dim(node2vecOutput)
+table(rownames(node2vecOutput) %in% bats$Plant_specific.epiteth)
+table(rownames(node2vecOutput) %in% bats$Frug_Epitetus)
+```
+
+
+
+
+
+
+Trying some NeuralNet Stuff
+```{r}
+bats <- filter(dat, Frug_Group=="Bats")
+dat <- bats
+
+library(neuralnet)
+
+
+FrugTraits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3") 
+
+PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+
+
+#woodedWalk <- function(dat, FrugTraits, PlantTraits){
+  #Set up our data into a fully expanded edgelist
+  require(tidyr)
+  dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
+  dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
+  full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
+  full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
+  full_real$real[is.na(full_real$real)==TRUE] <- 0
+
+  full_real_frugs <- dat[,c("Frugivore_Species", FrugTraits)] %>% unique() %>% left_join(full_real, ., by="Frugivore_Species") #Add in our frugivore traits
+
+  full_real_both <- dat[,c("Plant_Species", PlantTraits)] %>% unique() %>% left_join(full_real_frugs, ., by="Plant_Species") #add in our plant traits
+  
+  full_real_both$real <- as.factor(full_real_both$real)
+  
+  #Salve our variables using z-scores (mean=0, sd=1)
+  full_real_both$Frug_Body_Mass <- scale(full_real_both$Frug_Body_Mass)
+  full_real_both$Frug_Mean_Gape_Size <- scale(full_real_both$Frug_Mean_Gape_Size)
+  full_real_both$fruit_diameter <- scale(full_real_both$fruit_diameter)
+  full_real_both$fruit_length <- scale(full_real_both$fruit_length)
+  
+  # Subsample our edgelist
+  sample_IDs <- sample(round(nrow(full_real_both)*0.8), replace=F) #subsample out 80% of our edges. 
+  test <- full_real_both[-sample_IDs,] #assign 80% train set
+  train <- full_real_both[sample_IDs,]
+  
+  
+  
+  
+n <- names(train[4:ncol(train)])
+f <- as.formula(paste("real ~", paste(n, collapse = " + ")))
+tictoc::tic()
+nn <- neuralnet(f,data=train,hidden=c(8,5,5,2),linear.output=F, stepmax = 1e+06, threshold = 0.05)
+tictoc::toc()
+plot(nn)
+
+test$nn_preds <- predict(nn, test)[,1]
+roc(response=test$real, predictor=test$nn_preds)
+plot(roc(response=test$real, predictor=test$nn_preds))
+
+
+
+```
+
 
 
 
