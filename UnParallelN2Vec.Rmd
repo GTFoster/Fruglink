@@ -262,22 +262,14 @@ emb<-node2vecR(use_data,p=2,q=1,num_walks=5,walk_length=5,dim=10)
 ```
 
 ```{r}
-library(word2vec)
-library(udpipe)
-## Take data and standardise it a bit
-data(brussels_reviews, package = "udpipe")
-x <- subset(brussels_reviews, language == "nl")
-x <- tolower(x$feedback)
+stuff <- sapply(output, '[', 4)
 
-## Build the model get word embeddings and nearest neighbours
-model <- word2vec(x = x, dim = 15, iter = 20)
-emb   <- as.matrix(model)
-head(emb)
-emb <- predict(model, c("bus", "toilet", "unknownword"), type = "embedding")
-emb
-nn  <- predict(model, c("bus", "toilet"), type = "nearest", top_n = 5)
-nn
+get <- function(input){
+  input[,1]
+}
 
-class(model)
+
+
+values <- array(sapply(X=stuff, FUN=dist), NA, dim=c(11781,400,400))
 ```
 
