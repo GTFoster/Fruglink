@@ -1,0 +1,488 @@
+---
+title: "Fruglink Full Network Predictions"
+author: "Grant Foster"
+date: "2/11/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+dat <- birds
+
+woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, output_type="predictions"){
+  if((output_type %in% c("rfobject", "predictions"))==FALSE){
+    stop("Invalid output_type: choices are performance or rfobject")
+  }
+  #Set up our data into a fully expanded edgelist
+  require(tidyr)
+  dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
+  dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
+  
+  dat <- dplyr::select_at(dat, vars(c(Frugivore_Species, Plant_Species, real, FrugTraits, PlantTraits))) #Select our relevant predictors
+  dat %<>% unique(.) #Make sure we only have unique entries
+  full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
+  full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
+  full_real$real[is.na(full_real$real)==TRUE] <- 0
+
+  full_real_frugs <- dat[,c("Frugivore_Species", FrugTraits)] %>% unique() %>% left_join(full_real, ., by="Frugivore_Species") #Add in our frugivore traits
+
+  full_real_both <- dat[,c("Plant_Species", PlantTraits)] %>% unique() %>% left_join(full_real_frugs, ., by="Plant_Species") #add in our plant traits
+  
+  full_real_both$real <- as.factor(full_real_both$real)
+  
+  #if(class_balancing==TRUE){
+    # Subsample our edgelist
+    #ones <- full_real_both %>% dplyr::filter(., real==1)
+    
+    #zeroes <- full_real_both %>% dplyr::filter(., real==0)
+    #zero_IDs <- sample(x=1:nrow(zeroes), size=nrow(ones)*balance_ratio, replace=F) #Ratio of train to test 1:3
+    #keptZeroes <- zeroes[zero_IDs,]
+    
+    #nrow(rbind(trainZeroes, testZeroes, trainOnes, testOnes)) == nrow(full_real_both) #Making sure we're not losing anything
+    #balanced <- rbind(ones, keptZeroes)
+    #full_real_both <- balanced
+  #}
+  
+  rf<-randomForest::randomForest(real ~. -Frugivore_Species - Plant_Species, data=full_real_both, ntree=100)
+  #ROC <- roc(full_real_both$real, rf$votes[,2])
+  predictions <- stats::predict(rf, newdata=full_real_both, type="prob")
+  
+  if(output_type=="predictions"){
+    output <- full_real_both %>% select(., "Frugivore_Species", "Plant_Species", real)
+    output$S <- predictions[,2]
+    return(output)
+  }
+  
+  if(output_type=="rfobject"){
+    output <- rf
+  return(output)
+  }
+  #return(output)
+}
+```
+
+
+```{r}
+p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
+p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+#p_latent <- c("plantSim", "Psvd1", "Psvd2", "Psvd3") #Both methods together
+p_latent <- c("Psvd1", "Psvd2", "Psvd3")
+
+f_phylo <- c("fc1", "fc2", "fc3")
+f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3")
+#f_latent <- c("frugSim", "Fsvd1", "Fsvd2", "Fsvd3")
+f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
+```
+
+
+```{r}
+Phy <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = FALSE)
+colnames(Phy) <- c("Frugivore_Species", "Plant_Species", "real", "Phy")
+
+Traits <- woodedWalk_NoSplit(birds, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = FALSE)
+colnames(Traits) <- c("Frugivore_Species", "Plant_Species", "real", "Traits")
+
+Latent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = FALSE)
+colnames(Latent) <- c("Frugivore_Species", "Plant_Species", "real", "Latent")
+
+
+PhyTraits <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = FALSE)
+colnames(PhyTraits) <- c("Frugivore_Species", "Plant_Species", "real", "PhyTraits")
+
+TraitsLatent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = FALSE)
+colnames(TraitsLatent) <- c("Frugivore_Species", "Plant_Species", "real", "TraitsLatent")
+
+
+PhyLatent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = FALSE)
+colnames(PhyLatent) <- c("Frugivore_Species", "Plant_Species", "real", "PhyLatent")
+
+
+Trio <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = FALSE)
+colnames(Trio) <- c("Frugivore_Species", "Plant_Species", "real", "Trio")
+
+
+composite <- Traits %>% select(., -real) %>% left_join(Phy, ., by = c("Frugivore_Species", "Plant_Species"))
+composite <- Latent %>% select(., -real) %>% dplyr::left_join(composite, ., by=c("Frugivore_Species", "Plant_Species"))
+composite <- PhyTraits %>% select(., -real) %>% left_join(composite, .)
+composite <- TraitsLatent %>% select(., -real) %>% left_join(composite, .)
+composite <- PhyLatent %>% select(., -real) %>% left_join(composite, .)
+composite <- Trio %>% select(., -real) %>% left_join(composite, .)
+
+composite %<>% filter(., is.na(Traits)==FALSE)
+composite %<>% filter(., is.na(Phy)==FALSE)
+composite %<>% filter(., is.na(Trio)==FALSE)
+
+range(table(composite$Frugivore_Species, composite$Plant_Species))
+```
+
+
+```{r}
+cor.matrix <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
+  as.matrix %>%
+  cor %>%
+  as.data.frame %>%
+  rownames_to_column(var = 'var1') %>%
+  gather(var2, value, -var1)
+
+cor.conventional <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
+  as.matrix %>%
+  cor
+
+spear.matrix <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
+  as.matrix %>%
+  cor(method="spearman") %>%
+  as.data.frame %>%
+  rownames_to_column(var = 'var1') %>%
+  gather(var2, value, -var1)
+
+spear.conventional <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
+  as.matrix %>%
+  cor(method="spearman")
+```
+
+
+```{r}
+predicts <- dplyr::filter(composite, real==0)
+
+binQuants <- function(input, quantil=0.95){
+  input[input > quantile(input , quantil)] <- 1
+  input[input<1] <- 0
+  return(input)
+}
+
+predicts$Phy <- binQuants(predicts$Phy)
+predicts$Traits <- binQuants(predicts$Traits)
+predicts$Latent <- binQuants(predicts$Latent)
+predicts$PhyTraits <- binQuants(predicts$PhyTraits)
+predicts$PhyLatent <- binQuants(predicts$PhyLatent)
+predicts$TraitsLatent <- binQuants(predicts$TraitsLatent)
+predicts$Trio <- binQuants(predicts$Trio)
+
+
+predicts <- mutate(predicts, sum_agree=Phy+Traits+Latent+PhyTraits+TraitsLatent+PhyLatent+Trio)
+predicts %<>% filter(., sum_agree > 0)
+table(predicts$sum_agree)
+
+predicts <- mutate(predicts, ordering=Latent*4+
+                     Phy*8+
+                     PhyLatent*16+
+                     PhyTraits*32+
+                     TraitsLatent*64+
+                     Traits*128+
+                     Trio*256)
+
+
+predicts_best <- dplyr::filter(predicts, sum_agree > 4)
+predicts_best <- predicts
+predicts_best$Link <- paste(predicts_best$Frugivore_Species, predicts_best$Plant_Species, sep="-")
+
+predicts_best[,4:10][predicts_best[,4:10]==0] <- NA
+
+predicts_best$Link <- as.factor(predicts_best$Link)
+predicts_best$Link <- reorder(predicts_best$Link, predicts_best$ordering)
+
+
+predicts_best$Link <- reorder(predicts_best$Link, predicts_best$sum_agree)
+predicts_best$Link <- reorder(predicts_best$Link, -predicts_best$Trio)
+predicts_best$Link <- reorder(predicts_best$Link, -predicts_best$Phy)
+predicts_best$Link <- reorder(predicts_best$Link, -predicts_best$Traits)
+predicts_best$Link <- reorder(predicts_best$Link, -predicts_best$PhyTraits)
+predicts_best$Link <- reorder(predicts_best$Link, -predicts_best$Latent)
+predicts_best$Link <- reorder(predicts_best$Link, -predicts_best$PhyLatent)
+predicts_best$Link <- reorder(predicts_best$Link, -predicts_best$Trio)
+
+
+ggplot(data=predicts_best, aes(y=Link, x=as.factor("Phy"), fill=Phy))+geom_tile()+
+geom_tile(aes(y=Link, x=as.factor("Latent"), fill=Latent))+
+  geom_tile(aes(y=Link, x=as.factor("Traits"), fill=Traits))+
+  geom_tile(aes(y=Link, x=as.factor("PhyTraits"), fill=PhyTraits))+
+  geom_tile(aes(y=Link, x=as.factor("PhyLatent"), fill=PhyLatent))+
+  geom_tile(aes(y=Link, x=as.factor("TraitLatent"), fill=TraitsLatent))+
+  geom_tile(aes(y=Link, x=as.factor("Trio"), fill=Trio))+
+  theme(axis.text.y = element_blank())
+```
+
+
+```{r}
+table(predicts$sum_agree)
+
+loneHater <- predicts[predicts$sum_agree==6,]
+
+
+temp <- c(table((loneHater$Phy==0))["TRUE"], "Phy")
+temp <- rbind(temp, c(table((loneHater$Traits==0))["TRUE"], "Traits"))
+temp <- rbind(temp, c(table((loneHater$Latent==0))["TRUE"], "Latent"))
+temp <- rbind(temp, c(table((loneHater$PhyTraits==0))["TRUE"], "PhyTraits"))
+temp <- rbind(temp, c(table((loneHater$TraitsLatent==0))["TRUE"], "TraitsLatent"))
+temp <- rbind(temp, c(table((loneHater$PhyLatent==0))["TRUE"], "PhyLatent"))
+temp <- rbind(temp, c(table((loneHater$Trio==0))["TRUE"], "Trio"))
+
+dim(temp)
+
+temp <- data.frame(temp)
+rownames(temp) <- NULL
+colnames(temp) <- c("Single_Hater_Count", "Model")
+temp$Single_Hater_Count <- as.numeric(temp$Single_Hater_Count)
+
+
+
+test <- dplyr::filter(predicts, sum_agree==5)
+nombres <- colnames(test)[4:10]
+doubleHaters <- matrix(nrow = length(nombres), ncol = length(nombres))
+colnames(doubleHaters) <- nombres
+rownames(doubleHaters) <- nombres
+for (i in 4:10){
+  for (j in 4:10){
+    x <- test[,i]+test[,j]
+    doubleHaters[i-3,j-3] <- as.numeric(table(x)["0"])
+  }
+}
+
+doubleHaters[is.na(doubleHaters)==TRUE] <- 0
+diag(doubleHaters)<-NA
+
+sum(temp$Single_Hater_Count)
+sum(doubleHaters, na.rm = TRUE)/2
+
+colnames(cor.matrix) <- c("Model_1", "Model_2", "correlation")
+colnames(spear.matrix) <- c("Model_1", "Model_2", "correlation")
+
+Tab1 <- kableExtra::kable(temp, caption = "Table 1: Number of times when a given model was the only one to disagree on a link's placement in the top 95%. N=225") %>% kableExtra::kable_classic()
+Tab2 <- kableExtra::kable(doubleHaters, caption = "Table 2: Number of times when any 2 models disagreed with the other 5 on a link's placement in the top 95%. N=272") %>% kableExtra::kable_styling()
+Tab3 <- kableExtra::kable(round(cor.conventional, 2), caption = "Table 3:Pairwise pearson corelations of suitibility values") %>% kableExtra::kable_styling()
+Tab4 <- kableExtra::kable(round(spear.conventional, 2), caption = "Table 4: Pairwise Spearman's corelations of suitibility values") %>% kableExtra::kable_styling()
+
+
+kableExtra::save_kable(Tab1, file="Tables/Tab1.pdf")
+kableExtra::save_kable(Tab2, file="Tables/Tab2.pdf")
+kableExtra::save_kable(Tab3, file="Tables/Tab3.pdf")
+kableExtra::save_kable(Tab4, file="Tables/Tab4.pdf")
+```
+
+```{r}
+spear.matrix <- cor(composite[,4:ncol(composite)], method="spearman")
+corrplot::corrplot(spear.matrix, type = "lower", diag=T, order = "AOE")
+
+corr.matrix <- cor(composite[,4:ncol(composite)], method="pearson")
+corrplot::corrplot(corr.matrix, type = "lower", diag=T, order = "AOE")
+
+```
+
+
+Try above plot again, but this time with continuous fill
+
+```{r}
+
+composite <- dplyr::mutate(composite, sum=Phy+Traits+Latent+PhyTraits+TraitsLatent+PhyLatent+Trio)
+
+key <- composite
+key$Phy <- binQuants(key$Phy, quantil = 0.9)
+key$Traits <- binQuants(key$Traits, quantil = 0.9)
+key$Latent <- binQuants(key$Latent, quantil = 0.9)
+key$PhyTraits <- binQuants(key$PhyTraits, quantil = 0.9)
+key$PhyLatent <- binQuants(key$PhyLatent, quantil = 0.9)
+key$TraitsLatent <- binQuants(key$TraitsLatent, quantil = 0.9)
+key$Trio <- binQuants(key$Trio, quantil = 0.9)
+key$sum_agree <- key$Phy+ key$Traits + key$Latent + key$PhyTraits + key$PhyLatent + key$TraitsLatent + key$Trio
+
+
+top <- composite[which(key$sum_agree>0),]
+```
+
+
+
+```{r}
+top$Link <- paste(top$Frugivore_Species, top$Plant_Species, sep="-")
+selection <- top[sample(1:nrow(top), size=100, replace = FALSE),]
+
+ggplot(data=selection, aes(y=Link, x=as.factor("Phy"), fill=Phy))+
+  geom_tile()+
+  theme(axis.text.y = element_blank())+
+  geom_tile(aes(y=Link, x=as.factor("Latent"), fill=Latent))+
+  geom_tile(aes(y=Link, x=as.factor("Traits"), fill=Traits))+
+  geom_tile(aes(y=Link, x=as.factor("PhyTraits"), fill=PhyTraits))+
+  geom_tile(aes(y=Link, x=as.factor("PhyLatent"), fill=PhyLatent))+
+  geom_tile(aes(y=Link, x=as.factor("TraitLatent"), fill=TraitsLatent))+
+  geom_tile(aes(y=Link, x=as.factor("Trio"), fill=Trio))
+
+selection[order(-selection$sum),][,4:10]
+
+selection$Phy <- (selection$Phy)*(1/max(selection$Phy))
+selection$Latent <- (selection$Latent)*(1/max(selection$Latent))
+selection$Traits <- (selection$Traits)*(1/max(selection$Traits))
+selection$PhyLatent <- (selection$PhyLatent)*(1/max(selection$PhyLatent))
+selection$TraitsLatent <- (selection$TraitsLatent)*(1/max(selection$TraitsLatent))
+selection$PhyTraits <- (selection$PhyTraits)*(1/max(selection$PhyTraits))
+selection$Trio <- (selection$Trio)*(1/max(selection$Trio))
+
+selection <- dplyr::mutate(selection, sum=Phy+Traits+Latent+PhyTraits+TraitsLatent+PhyLatent+Trio)
+selection[order(selection$sum),]
+
+selection_0 <- dplyr::filter(selection, real==0) %>% dplyr::select(., -sum, -real, -Plant_Species, -Frugivore_Species) %>% column_to_rownames(., var="Link")
+
+hist(selection$Trio)
+
+heatmap(as.matrix(selection_0), Rowv = NA, Colv=NA)
+```
+
+Variable importance
+
+```{r}
+Phy_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = FALSE, output_type = "rfobject")
+
+Traits_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = FALSE, output_type = "rfobject")
+
+Latent_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = FALSE, output_type = "rfobject")
+
+PhyTraits_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = FALSE, output_type = "rfobject")
+
+TraitsLatent_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = FALSE, output_type = "rfobject")
+
+PhyLatent_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = FALSE, output_type = "rfobject")
+
+Trio_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = FALSE, output_type = "rfobject")
+
+models <- list("Phy_rf"=Phy_rf, "Traits_rf"=Traits_rf, "Latent_rf"=Latent_rf, "PhyTraits_rf"=PhyTraits_rf, "TraitsLatent_rf"=TraitsLatent_rf, "PhyLatent_rf"=PhyLatent_rf, 
+               "Trio_rf"=Trio_rf)
+```
+
+```{r}
+
+output <- data.frame(models[[7]]$importance)
+output$model <- names(models)[7]
+output <- rownames_to_column(output, var = "Variable")
+  
+
+for(i in 1:6){
+  temp <- data.frame(models[[i]]$importance)
+  temp$model <- names(models)[i]
+  temp <- rownames_to_column(temp, var = "Variable")
+  output <- rbind(output, temp)
+}
+
+output$MeanDecreaseGini <- as.numeric(output$MeanDecreaseGini)
+```
+
+```{r}
+output$varType <- NA
+output$varType[output$Variable %in% c(f_phylo, p_phylo)==TRUE] <- "Phylo"
+output$varType[output$Variable %in% c(f_traits, p_traits)==TRUE] <- "Trait"
+output$varType[output$Variable %in% c(f_latent, p_latent)==TRUE] <- "Latent"
+
+output$Variable <- as.factor(output$Variable)
+```
+
+```{r}
+ggplot(data=output, aes(y=Variable, x=MeanDecreaseGini, color=model))+geom_point()
+
+plot(x=output$MeanDecreaseGini, 
+     y=output$Variable, 
+     yaxt = "n",
+     col=as.factor(output$model), 
+     pch=19)
+axis(2, 1:32, levels(output$Variable))
+
+```
+
+```{r}
+
+
+Trio_levels <- output %>% dplyr::filter(., model=="Trio_rf")
+Trio_levels <- levels(reorder(Trio_levels$Variable, Trio_levels$MeanDecreaseGini))
+
+
+Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
+
+colKey <- vector(mode="character", length=nrow(output))
+colKey[levels(output$Variable) %in% c(f_phylo, p_phylo)==TRUE] <- Trio_Colors[1]
+colKey[levels(output$Variable) %in% c(f_traits, p_traits)==TRUE] <- Trio_Colors[2]
+colKey[levels(output$Variable) %in% c(f_latent, p_latent)==TRUE] <- Trio_Colors[3]
+
+pdf(file="VarImportance.pdf", width=11, height=11)
+ggplot(data=output, aes(y=Variable, x=MeanDecreaseGini, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
+  scale_fill_manual(values = c("Phy_rf" = "#E411E0",
+                                "Traits_rf" = "#E0E411",
+                                "Latent_rf" = "#11E0E4",
+                                "PhyTraits_rf" = "#E27B79",
+                                "TraitsLatent_rf" = "#79E27B",
+                                "PhyLatent_rf" = "#7B79E2",
+                                "Trio_rf" = "#56549e"
+                                ))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+```
+
+```{r}
+output_niceName <- output
+
+levels(output_niceName$Variable)[match("Psvd1",levels(output_niceName$Variable))] <- "Plant SVD: Axis 1"
+levels(output_niceName$Variable)[match("Psvd2",levels(output_niceName$Variable))] <- "Plant SVD: Axis 2"
+levels(output_niceName$Variable)[match("Psvd3",levels(output_niceName$Variable))] <- "Plant SVD: Axis 3"
+levels(output_niceName$Variable)[match("Fsvd1",levels(output_niceName$Variable))] <- "Frugivore SVD: Axis 1"
+levels(output_niceName$Variable)[match("Fsvd2",levels(output_niceName$Variable))] <- "Frugivore SVD: Axis 2"
+levels(output_niceName$Variable)[match("Fsvd3",levels(output_niceName$Variable))] <- "Frugivore SVD: Axis 3"
+
+levels(output_niceName$Variable)[match("c1PIDecomp",levels(output_niceName$Variable))] <- "Plant Phylogeny: Axis 1"
+levels(output_niceName$Variable)[match("c2PIDecomp",levels(output_niceName$Variable))] <- "Plant Phylogeny: Axis 2"
+levels(output_niceName$Variable)[match("c3PIDecomp",levels(output_niceName$Variable))] <- "Plant Phylogeny: Axis 3"
+levels(output_niceName$Variable)[match("fc1",levels(output_niceName$Variable))] <- "Frugivore Phylogeny: Axis 1"
+levels(output_niceName$Variable)[match("fc2",levels(output_niceName$Variable))] <- "Frugivore Phylogeny: Axis 2"
+levels(output_niceName$Variable)[match("fc3",levels(output_niceName$Variable))] <- "Frugivore Phylogeny: Axis 3"
+
+levels(output_niceName$Variable)[match("Frug_Mean_Gape_Size",levels(output_niceName$Variable))] <- "Frugivore Gape Size"
+levels(output_niceName$Variable)[match("Frug_Body_Mass",levels(output_niceName$Variable))] <- "Frugivore Mass"
+levels(output_niceName$Variable)[match("fruit_diameter",levels(output_niceName$Variable))] <- "Fruit Diameter"
+levels(output_niceName$Variable)[match("fruit_length",levels(output_niceName$Variable))] <- "Fruit Length"
+levels(output_niceName$Variable)[match("red",levels(output_niceName$Variable))] <- "Red Fruit"
+levels(output_niceName$Variable)[match("black",levels(output_niceName$Variable))] <- "Black Fruit"
+levels(output_niceName$Variable)[match("green",levels(output_niceName$Variable))] <- "Green Fruit"
+levels(output_niceName$Variable)[match("yellow",levels(output_niceName$Variable))] <- "Yellow Fruit"
+levels(output_niceName$Variable)[match("brown",levels(output_niceName$Variable))] <- "Brown Fruit"
+levels(output_niceName$Variable)[match("tree",levels(output_niceName$Variable))] <- "Tree"
+levels(output_niceName$Variable)[match("palm",levels(output_niceName$Variable))] <- "Palm"
+levels(output_niceName$Variable)[match("liana",levels(output_niceName$Variable))] <- "Liana"
+levels(output_niceName$Variable)[match("scrub",levels(output_niceName$Variable))] <- "Scrub"
+
+levels(output_niceName$Variable)[match("LipScore1",levels(output_niceName$Variable))] <- "Low Lipid Content Fruit"
+levels(output_niceName$Variable)[match("LipScore2",levels(output_niceName$Variable))] <- "Mid Lipid Content Fruit"
+levels(output_niceName$Variable)[match("LipScore3",levels(output_niceName$Variable))] <- "High Lipid Content Fruit"
+
+levels(output_niceName$Variable)[match("FrugScore1",levels(output_niceName$Variable))] <- "Occasional Frugivore"
+levels(output_niceName$Variable)[match("FrugScore2",levels(output_niceName$Variable))] <- "Facultative Frugivore"
+levels(output_niceName$Variable)[match("FrugScore3",levels(output_niceName$Variable))] <- "Strict Frugivore"
+
+```
+
+```{r}
+pdf(file="VarImportance.pdf", width=11, height=11)
+ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
+  scale_fill_manual(values = c("Phy_rf" = "#E411E0",
+                                "Traits_rf" = "#E0E411",
+                                "Latent_rf" = "#11E0E4",
+                                "PhyTraits_rf" = "#E27B79",
+                                "TraitsLatent_rf" = "#79E27B",
+                                "PhyLatent_rf" = "#7B79E2",
+                                "Trio_rf" = "#56549e"
+                                ))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+```
+
+
+```{r}
+pdf(file="VarImportanceDots.pdf", width=11, height=11)
+ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, col=model))+geom_point(size=5)+theme_classic()+
+  scale_color_manual(values = alpha(c("Phy_rf" = "#E411E0",
+                                "Traits_rf" = "#E0E411",
+                                "Latent_rf" = "#11E0E4",
+                                "PhyTraits_rf" = "#E27B79",
+                                "TraitsLatent_rf" = "#79E27B",
+                                "PhyLatent_rf" = "#7B79E2",
+                                "Trio_rf" = "#56549e"
+                                ), 0.5))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+```
+

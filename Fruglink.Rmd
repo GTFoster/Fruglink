@@ -49,7 +49,6 @@ V(web)$color[V(web)$type==FALSE] <- "blue"
 
 
 ```{r basic plot of igraph web eval=FALSE}
-
 plot(web, layout=layout_as_bipartite(web), edge.width=0.25, vertex.label=NA, vertex.size=1)
 
 
@@ -214,7 +213,7 @@ Since we have one tree for the plant species, I just do a singular decomposition
 ```{r add plant phylogeny to dat}
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:5]) #first three vectors only contain about 28% of variation :(
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:5]) #first three vectors contain about 42.6% of variation :(
 
 plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
 colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
@@ -318,9 +317,9 @@ AUC_BatsTraits <- roc(data=bats_kde$test, response=real, predictor=S)
 plot(AUC_BatsTraits)
 AUC_BatsTraits
 
-FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"); PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
 
-FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green")
+#FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size"); PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green")
 
 apply(bats, MARGIN=2, table)
 ```
@@ -337,6 +336,7 @@ colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3", "fc4")
 frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
 
 bats_temp <- left_join(bats, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
+bats <- bats_temp
 ```
   
 Run it
@@ -379,6 +379,7 @@ colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
 frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
 
 birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
+birds <- birds_temp
 ```
   
 Run it
@@ -431,7 +432,7 @@ dat <- vegstuff(dat)
 
 
 ```{r}
-bats <- dplyr::filter(dat, Frug_Group=="Bats") %>% dplyr::select(., -frugSim, -plantSim)
+#bats <- dplyr::filter(dat, Frug_Group=="Bats") %>% dplyr::select(., -frugSim, -plantSim)
 bats <- vegstuff(bats)
 
 bats_vegdist_kde <- pp.kde(bats, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
@@ -445,7 +446,7 @@ AUC_BatsVegdist
 
 Woah, this actually works super well with birds!
 ```{r}
-birds <- dplyr::filter(dat, Frug_Class=="Aves") %>% dplyr::select(., -frugSim, -plantSim)
+#birds <- dplyr::filter(dat, Frug_Class=="Aves") %>% dplyr::select(., -frugSim, -plantSim)
 birds <- vegstuff(birds)
 
 birds_vegdist_kde <- pp.kde(birds, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
@@ -463,7 +464,6 @@ AUC_birdsVegdist
 
 full data
 ```{r}
-
 full_vegdist_kde <- pp.kde(dat, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
 #Predictors include continuous variables plus plant form and lipid score
 full_vegdist_kde$test$S <- predict.pp.kde(model=full_vegdist_kde, x=full_vegdist_kde$test[,4:ncol(full_vegdist_kde$test)]) #Predict on test set and assign suitability scores
@@ -495,11 +495,13 @@ Now, let's try some random forest models.
 
 desmos::evaluate()
 ```{r}
-woodedWalk <- function(dat, FrugTraits, PlantTraits){
+woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3){
   #Set up our data into a fully expanded edgelist
   require(tidyr)
   dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
   dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
+  dat <- dplyr::select_at(dat, vars(c(Frugivore_Species, Plant_Species, real, FrugTraits, PlantTraits))) #Select our relevant predictors
+  dat %<>% unique(.) #Make sure we only have unique entries
   full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
   full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
   full_real$real[is.na(full_real$real)==TRUE] <- 0
@@ -510,11 +512,31 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits){
   
   full_real_both$real <- as.factor(full_real_both$real)
   
-  # Subsample our edgelist
-  sample_IDs <- sample(round(nrow(full_real_both)*0.8), replace=F) #subsample out 80% of our edges. 
-  test <- full_real_both[-sample_IDs,] #assign 80% train set
-  train <- full_real_both[sample_IDs,]
-  
+  if(class_balancing==TRUE){
+    # Subsample our edgelist
+    ones <- full_real_both %>% dplyr::filter(., real==1)
+    #one_IDs <- sample(round(nrow(ones)*0.8), replace=F)
+    #testOnes <- ones[-one_IDs,]
+    #trainOnes <- ones[one_IDs,]
+    
+    zeroes <- full_real_both %>% dplyr::filter(., real==0)
+    zero_IDs <- sample(x=1:nrow(zeroes), size=nrow(ones)*balance_ratio, replace=F) #Ratio of train to test 1:3
+    keptZeroes <- zeroes[zero_IDs,]
+    
+    #nrow(rbind(trainZeroes, testZeroes, trainOnes, testOnes)) == nrow(full_real_both) #Making sure we're not losing anything
+    balanced <- rbind(ones, keptZeroes)
+    
+    balanced_IDs <- sample(x=1:nrow(balanced),size=round(nrow(balanced)*0.8), replace=F) #subsample out 80% of our edges. 
+    test <- balanced[-c(balanced_IDs),] #assign 0% train set
+    train <- balanced[balanced_IDs,] #assign 80% train set
+  }
+    
+  if(class_balancing==FALSE){
+       # Just Subsample our edgelist as is-don't do any balancing
+    sample_IDs <- sample(x=1:nrow(full_real_both), size=round(nrow(full_real_both)*0.8), replace=F) #subsample out 80% of our edges. 
+    test <- full_real_both[-sample_IDs,] #assign 80% train set
+    train <- full_real_both[sample_IDs,]
+  }
 
   rf<-randomForest::randomForest(real ~. -Frugivore_Species - Plant_Species, data=train, ntree=100)
   trainROC <- roc(train$real,rf$votes[,2])
@@ -525,6 +547,10 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits){
   return(model)
 }
 
+dat
+dat_real <- dat
+dat <- dat_real
+balance_ratio <- 3
 ```
 
 ## Apply Random forest to Bats
@@ -625,102 +651,443 @@ plot(AUC_RF_BatsVegdist, main="Random Forest Vegdist(Latent) ROC; Bats")
 mtext(paste("AUC", round(AUC_RF_BatsVegdist$auc, 3), sep="="), side=1)
 ```
 
-
-Node2Vec
+#Comparisons
+First, put our info types in boxes for ease of use
 ```{r}
-library(node2vec)
-library(tictoc)
-tic()
-node2vecOutput <- dat %>% select(., Frug_Epitetus, Plant_specific.epiteth) %>% data.frame() %>% node2vecR(data=., p=1,q=1, num_walks=10,walk_length=10,dim=10)
-toc()
+p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
+p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+p_latent <- c("plantSim")
 
-dim(node2vecOutput)
-table(rownames(node2vecOutput) %in% bats$Plant_specific.epiteth)
-table(rownames(node2vecOutput) %in% bats$Frug_Epitetus)
+f_phylo <- c("fc1", "fc2", "fc3")
+f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3")
+f_latent <- c("frugSim")
+```
+
+
+Starting with random forest.
+
+RF Phylo + Trait.
+```{r}
+birds_rf_PhyTraits <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits))
+
+birds_rf_TraitsLatent <- woodedWalk(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
+
+birds_rf_PhyLatent <- woodedWalk(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
+
+birds_rf_Trio <- woodedWalk(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits))
+
+AUC_birds_rf_TraitsLatent <- roc(data=birds_rf_TraitsLatent$test, response=real, predictor=S)
+plot(AUC_birds_rf_TraitsLatent)
+AUC_birds_rf_TraitsLatent
+
+AUC_birds_rf_PhyTraits <- roc(data=birds_rf_PhyTraits$test, response=real, predictor=S)
+plot(AUC_birds_rf_PhyTraits)
+AUC_birds_rf_PhyTraits
+
+AUC_birds_rf_PhyLatent <- roc(data=birds_rf_PhyLatent$test, response=real, predictor=S)
+plot(AUC_birds_rf_PhyLatent)
+AUC_birds_rf_PhyLatent
+
+AUC_birds_rf_Trio <- roc(data=birds_rf_Trio$test, response=real, predictor=S)
+plot(AUC_birds_rf_Trio)
+AUC_birds_rf_Trio
+```
+
+```{r}
+#pdf(file = "Birds_RF_Combos.pdf", height = 11, width=8.5)
+par(mfrow=c(3,2))
+plot(AUC_birds_rf_TraitsLatent, main="RF Traits & Latent ROC; Birds")
+mtext(paste("AUC", round(AUC_birds_rf_TraitsLatent$auc, 3), sep="="), side=1)
+
+plot(AUC_birds_rf_PhyTraits, main="RF Phylo & Traits ROC; Birds")
+mtext(paste("AUC", round(AUC_birds_rf_PhyTraits$auc, 3), sep="="), side=1)
+
+plot(AUC_birds_rf_PhyLatent, main="RF Phylo & Latent ROC; Birds")
+mtext(paste("AUC", round(AUC_birds_rf_PhyLatent$auc, 3), sep="="), side=1)
+
+plot(AUC_birds_rf_Trio, main="RF Trio ROC; Birds")
+mtext(paste("AUC", round(AUC_birds_rf_Trio$auc, 3), sep="="), side=1)
+```
+
+
+```{r}
+bats_rf_PhyTraits <- woodedWalk(bats, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits))
+
+bats_rf_TraitsLatent <- woodedWalk(bats, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
+
+bats_rf_PhyLatent <- woodedWalk(bats, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
+
+bats_rf_Trio <- woodedWalk(bats, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits))
+
+AUC_bats_rf_TraitsLatent <- roc(data=bats_rf_TraitsLatent$test, response=real, predictor=S)
+plot(AUC_bats_rf_TraitsLatent)
+AUC_bats_rf_TraitsLatent
+
+AUC_bats_rf_PhyTraits <- roc(data=bats_rf_PhyTraits$test, response=real, predictor=S)
+plot(AUC_bats_rf_PhyTraits)
+AUC_bats_rf_PhyTraits
+
+AUC_bats_rf_PhyLatent <- roc(data=bats_rf_PhyLatent$test, response=real, predictor=S)
+plot(AUC_bats_rf_PhyLatent)
+AUC_bats_rf_PhyLatent
+
+AUC_bats_rf_Trio <- roc(data=bats_rf_Trio$test, response=real, predictor=S)
+AUC_bats_rf_Trio
+AUC_bats_rf_Trio
+```
+
+```{r}
+#pdf(file = "Bats_RF_Combos.pdf", height = 11, width=8.5)
+par(mfrow=c(3,2))
+plot(AUC_bats_rf_TraitsLatent, main="RF Traits & Latent ROC; bats")
+mtext(paste("AUC", round(AUC_bats_rf_TraitsLatent$auc, 3), sep="="), side=1)
+
+plot(AUC_bats_rf_PhyTraits, main="RF Phylo & Traits ROC; bats")
+mtext(paste("AUC", round(AUC_bats_rf_PhyTraits$auc, 3), sep="="), side=1)
+
+plot(AUC_bats_rf_PhyLatent, main="RF Phylo & Latent ROC; bats")
+mtext(paste("AUC", round(AUC_bats_rf_PhyLatent$auc, 3), sep="="), side=1)
+
+plot(AUC_bats_rf_Trio, main="RF Trio ROC; bats")
+mtext(paste("AUC", round(AUC_bats_rf_Trio$auc, 3), sep="="), side=1)
+```
+
+Fancy Plot: Birds
+
+
+
+{r}
+
+#' computes a multitude of accuracy measures, because people love to quibble about accuracy.
+#' @param preds model predictions for vector-virus pair suitability
+#' @param acts binary variable representing known interaction between vector and virus
+#' @param threshold threshold for the H statistic. default = 0.5
+#'
+#' @return a list object of measures (some are `nrow(data)` long, others are 1 value)
+
+getAccuracy<- function(preds, acts, threshold=0.5){
+  require(ROCR); require(hmeasure)
+  acts <- unlist(acts)
+  auc <- unlist(ROCR::performance(ROCR::prediction(preds,acts),'auc')@y.values)
+  hmeas <- hmeasure::HMeasure(acts, preds, threshold=threshold)$metrics$H
+	mrse <- sqrt(sum((preds-acts)**2))
+	acc <- max(unlist(ROCR::performance(ROCR::prediction(preds,acts),'acc')@y.values))
+
+  return(c(
+		acc=acc,
+		auc=auc,
+		mrse=mrse,
+		H=hmeas
+  ))
+}
+```{r}
+getAccurate<- function(rfob, threshold=0.5){
+  require(ROCR); require(hmeasure)
+  
+  auc <- roc(data=rfob$test, response=real, predictor=S)$auc
+  hmeas <- hmeasure::HMeasure(true.class=rfob$test$real, scores=rfob$test$S)$metrics$H
+	mrse <- sqrt(sum((rfob$test$S-as.numeric(rfob$test$real))^2))
+	acc <- max(unlist(ROCR::performance(ROCR::prediction(rfob$test$S,rfob$test$real),'acc')@y.values))
+
+  return(list(
+		acc=acc,
+		auc=auc,
+		mrse=mrse,
+		H=hmeas,
+		m=deparse(substitute(rfob)) #return the name of your rfob input
+  ))
+}
+
+birds_rf_accuracy <- data.frame(rbind(unlist(getAccurate(birds_rf_traits)),
+      unlist(getAccurate(birds_rf_vegdist)),
+      unlist(getAccurate(birds_rf_plylo)),
+      unlist(getAccurate(birds_rf_PhyLatent)),
+      unlist(getAccurate(birds_rf_PhyTraits)),
+      unlist(getAccurate(birds_rf_TraitsLatent)),
+      unlist(getAccurate(birds_rf_Trio))))
+
+
+
+makeComPlot <- function(temp){
+temp$acc %<>% as.numeric(.)
+temp$auc %<>% as.numeric(.)
+temp$H %<>% as.numeric(.)
+temp$mrse %<>% as.numeric(.)
+
+temp$acc <- temp$acc/max(temp$acc)
+temp$auc <- temp$auc/max(temp$auc)
+temp$mrse <- temp$mrse/max(temp$mrse)
+temp$H <- temp$H/max(temp$H)
+
+
+pivot_longer(temp, 1:4, names_to = "stat") %>% ggplot(data=., aes(fill=stat, y=value, x=m)) + 
+    geom_bar(position="dodge", stat="identity")+xlab("Model")+ylab("Relative performance")+ggtitle("Bird Random Forest Link Prediction Performance Metrics (Value/Maximum)")+theme(axis.text = element_text(size=12))
+}
+
+```
+
+
+```{r}
+ggplot(data=birds_rf_accuracy, aes(x=m, y=H))+geom_bar(aes(y=H), stat="identity", position=position_dodge())+geom_bar(aes(y=acc), stat="identity", position=position_dodge(0.9))
+
+
+pivot_longer(birds_rf_accuracy, 1:4, names_to = "stat") 
+
+ 
+# Grouped
+
+birds_rf_accuracy$acc <- birds_rf_accuracy$acc/max(birds_rf_accuracy$acc)
+birds_rf_accuracy$auc <- birds_rf_accuracy$auc/max(birds_rf_accuracy$auc)
+birds_rf_accuracy$mrse <- birds_rf_accuracy$mrse/max(birds_rf_accuracy$mrse)
+birds_rf_accuracy$H <- birds_rf_accuracy$H/max(birds_rf_accuracy$H)
+pivot_longer(birds_rf_accuracy, 1:4, names_to = "stat")
+
+
+
+#pdf(file="bird_Rf_relcomp.pdf", height=8.5, width=11)
+pivot_longer(birds_rf_accuracy, 1:4, names_to = "stat") %>% ggplot(data=., aes(fill=stat, y=value, x=m)) + 
+    geom_bar(position="dodge", stat="identity")+xlab("Model")+ylab("Relative performance")+ggtitle("Bird Random Forest Link Prediction Performance Metrics (Value/Maximum)")+theme(axis.text = element_text(size=12))
+
+
+
+bats_rf_accuracy <- data.frame(rbind(unlist(getAccurate(bats_rf_traits)),
+      unlist(getAccurate(bats_rf_vegdist)),
+      unlist(getAccurate(bats_rf_plylo)),
+      unlist(getAccurate(bats_rf_PhyLatent)),
+      unlist(getAccurate(bats_rf_PhyTraits)),
+      unlist(getAccurate(bats_rf_TraitsLatent)),
+      unlist(getAccurate(bats_rf_Trio))))
+
+
+#pdf(file="bat_Rf_relcomp.pdf", height=8.5, width=11)
+makeComPlot(bats_rf_accuracy)
+```
+
+
+```{r}
+birds_kde_PhyTraits <- pp.kde(birds, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits))
+birds_kde_PhyTraits$test$S <- predict.pp.kde(model=birds_kde_PhyTraits, x=birds_kde_PhyTraits$test[,4:ncol(birds_kde_PhyTraits$test)])
+
+birds_kde_TraitsLatent <- pp.kde(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
+birds_kde_TraitsLatent$test$S <- predict.pp.kde(model=birds_kde_TraitsLatent, x=birds_kde_TraitsLatent$test[,4:ncol(birds_kde_TraitsLatent$test)])
+
+birds_kde_PhyLatent <- pp.kde(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
+birds_kde_PhyLatent$test$S <- predict.pp.kde(model=birds_kde_PhyLatent, x=birds_kde_PhyLatent$test[,4:ncol(birds_kdePhyLatent$test)])
+
+birds_rf_Trio <- pp.kde(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits))
+birds_rf_Trio$test$S <- predict.pp.kde(model=birds_rf_Trio, x=birds_rf_Trio$test[,4:ncol(birds_rf_Trio$test)])
+
+
+AUC_birds_kde_TraitsLatent <- roc(data=birds_kde_TraitsLatent$test, response=real, predictor=S)
+plot(AUC_birds_kde_TraitsLatent)
+AUC_birds_kde_TraitsLatent
+
+AUC_birds_kde_PhyTraits <- roc(data=birds_kde_PhyTraits$test, response=real, predictor=S)
+plot(AUC_bats_kde_PhyTraits)
+AUC_bats_kde_PhyTraits
+
+AUC_bats_kde_PhyLatent <- roc(data=bats_kde_PhyLatent$test, response=real, predictor=S)
+plot(AUC_bats_kde_PhyLatent)
+AUC_bats_kde_PhyLatent
+
+AUC_bats_kde_Trio <- roc(data=bats_kde_Trio$test, response=real, predictor=S)
+plot(AUC_bats_kde_Trio)
+AUC_bats_kde_Trio
+
+
+birds_rf_accuracy <- data.frame(rbind(unlist(getAccurate(birds_kde_traits)),
+      unlist(getAccurate(birds_kde_vegdist)),
+      unlist(getAccurate(birds_kde_plylo)),
+      unlist(getAccurate(birds_kde_PhyLatent)),
+      unlist(getAccurate(birds_kde_PhyTraits)),
+      unlist(getAccurate(birds_kde_TraitsLatent))))
+
+#pdf(file="birds_kde_relcomp.pdf", height=8.5, width=11)
+makeComPlot(bats_rf_accuracy)
+```
+Now, I'm redoing this after reducing the class imbalances in the training data
+
+```{r}
+birds_rebalancedRF_Phy <- woodedWalk(birds, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE)
+
+birds_rebalancedRF_Traits <- woodedWalk(birds, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE)
+
+birds_rebalancedRF_Latent <- woodedWalk(birds, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE)
+
+birds_rebalancedRF_PhyTraits <- woodedWalk(birds, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE)
+
+birds_rebalancedRF_TraitsLatent <- woodedWalk(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE)
+
+birds_rebalancedRF_PhyLatent <- woodedWalk(birds, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE)
+
+birds_rebalancedRF_Trio <- woodedWalk(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE)
+
+AUC_birds_rebalancedRF_Phy <- roc(data=birds_rebalancedRF_Phy$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_Phy)
+AUC_birds_rebalancedRF_Phy
+
+
+AUC_birds_rebalancedRF_Traits <- roc(data=birds_rebalancedRF_Traits$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_Traits)
+AUC_birds_rebalancedRF_Traits
+
+AUC_birds_rebalancedRF_Latent <- roc(data=birds_rebalancedRF_Latent$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_Latent)
+AUC_birds_rebalancedRF_Latent
+
+AUC_birds_rebalancedRF_PhyTraits <- roc(data=birds_rebalancedRF_PhyTraits$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_PhyTraits)
+AUC_birds_rebalancedRF_PhyTraits
+
+AUC_birds_rebalancedRF_TraitsLatent <- roc(data=birds_rebalancedRF_TraitsLatent$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_TraitsLatent)
+AUC_birds_rebalancedRF_TraitsLatent
+
+AUC_birds_rebalancedRF_PhyLatent <- roc(data=birds_rebalancedRF_PhyLatent$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_PhyLatent)
+AUC_birds_rebalancedRF_PhyLatent
+
+AUC_birds_rebalancedRF_Trio <- roc(data=birds_rebalancedRF_Trio$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_Trio)
+AUC_birds_rebalancedRF_Trio
+
+
+
+birds_rebalancedRF_accuracy <- data.frame(rbind(unlist(getAccurate(birds_rebalancedRF_Phy)),
+      unlist(getAccurate(birds_rebalancedRF_Traits)),
+      unlist(getAccurate(birds_rebalancedRF_Latent)),
+      unlist(getAccurate(birds_rebalancedRF_PhyTraits)),
+      unlist(getAccurate(birds_rebalancedRF_TraitsLatent)),
+      unlist(getAccurate(birds_rebalancedRF_PhyLatent)),
+      unlist(getAccurate(birds_rebalancedRF_Trio))))
+
+birds_rf_accuracy
+
+birds_rebalancedRF_accuracy
+
 ```
 
 
 
-
-
-
-Trying some NeuralNet Stuff
 ```{r}
-bats <- filter(dat, Frug_Group=="Bats")
-dat <- bats
+bats_rebalancedRF_Phy <- woodedWalk(bats, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE)
 
-library(neuralnet)
+bats_rebalancedRF_Traits <- woodedWalk(bats, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE)
 
+bats_rebalancedRF_Latent <- woodedWalk(bats, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE)
 
-FrugTraits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3") 
+bats_rebalancedRF_PhyTraits <- woodedWalk(bats, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE)
 
-PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+bats_rebalancedRF_TraitsLatent <- woodedWalk(bats, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE)
 
+bats_rebalancedRF_PhyLatent <- woodedWalk(bats, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE)
 
-#woodedWalk <- function(dat, FrugTraits, PlantTraits){
-  #Set up our data into a fully expanded edgelist
-  require(tidyr)
-  dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
-  dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
-  full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
-  full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
-  full_real$real[is.na(full_real$real)==TRUE] <- 0
+bats_rebalancedRF_Trio <- woodedWalk(bats, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE)
 
-  full_real_frugs <- dat[,c("Frugivore_Species", FrugTraits)] %>% unique() %>% left_join(full_real, ., by="Frugivore_Species") #Add in our frugivore traits
+AUC_bats_rebalancedRF_Phy <- roc(data=bats_rebalancedRF_Phy$test, response=real, predictor=S)
+plot(AUC_bats_rebalancedRF_Phy)
+AUC_bats_rebalancedRF_Phy
 
-  full_real_both <- dat[,c("Plant_Species", PlantTraits)] %>% unique() %>% left_join(full_real_frugs, ., by="Plant_Species") #add in our plant traits
-  
-  full_real_both$real <- as.factor(full_real_both$real)
-  
-  #Salve our variables using z-scores (mean=0, sd=1)
-  full_real_both$Frug_Body_Mass <- scale(full_real_both$Frug_Body_Mass)
-  full_real_both$Frug_Mean_Gape_Size <- scale(full_real_both$Frug_Mean_Gape_Size)
-  full_real_both$fruit_diameter <- scale(full_real_both$fruit_diameter)
-  full_real_both$fruit_length <- scale(full_real_both$fruit_length)
-  
-  # Subsample our edgelist
-  sample_IDs <- sample(round(nrow(full_real_both)*0.8), replace=F) #subsample out 80% of our edges. 
-  test <- full_real_both[-sample_IDs,] #assign 80% train set
-  train <- full_real_both[sample_IDs,]
-  
-  
-  
-  
-n <- names(train[4:ncol(train)])
-f <- as.formula(paste("real ~", paste(n, collapse = " + ")))
-tictoc::tic()
-nn <- neuralnet(f,data=train,hidden=c(8,5,5,2),linear.output=F, stepmax = 1e+06, threshold = 0.05)
-tictoc::toc()
-plot(nn)
+AUC_bats_rebalancedRF_Traits <- roc(data=bats_rebalancedRF_Traits$test, response=real, predictor=S)
+plot(AUC_bats_rebalancedRF_Traits)
+AUC_bats_rebalancedRF_Traits
 
-test$nn_preds <- predict(nn, test)[,1]
-roc(response=test$real, predictor=test$nn_preds)
-plot(roc(response=test$real, predictor=test$nn_preds))
+AUC_bats_rebalancedRF_Latent <- roc(data=bats_rebalancedRF_Latent$test, response=real, predictor=S)
+plot(AUC_bats_rebalancedRF_Latent)
+AUC_bats_rebalancedRF_Latent
+
+AUC_bats_rebalancedRF_PhyTraits <- roc(data=bats_rebalancedRF_PhyTraits$test, response=real, predictor=S)
+plot(AUC_bats_rebalancedRF_PhyTraits)
+AUC_bats_rebalancedRF_PhyTraits
+
+AUC_bats_rebalancedRF_TraitsLatent <- roc(data=bats_rebalancedRF_TraitsLatent$test, response=real, predictor=S)
+plot(AUC_bats_rebalancedRF_TraitsLatent)
+AUC_bats_rebalancedRF_TraitsLatent
+
+AUC_bats_rebalancedRF_PhyLatent <- roc(data=bats_rebalancedRF_PhyLatent$test, response=real, predictor=S)
+plot(AUC_bats_rebalancedRF_PhyLatent)
+AUC_bats_rebalancedRF_PhyLatent
+
+AUC_bats_rebalancedRF_Trio <- roc(data=bats_rebalancedRF_Trio$test, response=real, predictor=S)
+plot(AUC_bats_rebalancedRF_Trio)
+AUC_bats_rebalancedRF_Trio
+```
+
+Adding in SVD measures!
 
 
+```{r}
+svData <- function(dat){
+mat_assym <- as.data.frame.matrix(table(dat$Frugivore_Species, dat$Plant_Species)) #Rows = Frugivores, Columns = Plants
 
+decomp <- svd(mat_assym)#run svd decomposition
+u <- decomp$u #extract first 3 axis
+v <- data.frame(decomp$v) #I think this is the right dimension?
+
+plantsSVD <-data.frame(colnames(mat_assym), v[,1], v[,2], v[,3])
+colnames(plantsSVD) <- c("Plant_Species", "Psvd1", "Psvd2", "Psvd3")
+frugSVD <- data.frame(colnames(t(mat_assym)), u[,1], u[,2], u[,3])
+colnames(frugSVD) <- c("Frugivore_Species", "Fsvd1", "Fsvd2", "Fsvd3")
+
+dat_wP <- left_join(dat, plantsSVD, by="Plant_Species")
+dat_new <- left_join(dat_wP, frugSVD, by="Frugivore_Species")
+
+return(dat_new)
+}
+
+birds <- svData(birds)
+bats <- svData(bats)
 ```
 
 
+```{r}
+#p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
+#p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+#p_latent <- c("plantSim", "Psvd1", "Psvd2", "Psvd3") #Both methods together
+p_latent <- c("Psvd1", "Psvd2", "Psvd3")
+
+#f_phylo <- c("fc1", "fc2", "fc3")
+#f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3")
+#f_latent <- c("frugSim", "Fsvd1", "Fsvd2", "Fsvd3")
+f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
 
 
+birds_rebalancedRF_Latent <- woodedWalk(birds, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE)
 
-Looking at some network summary stats
+birds_rebalancedRF_TraitsLatent <- woodedWalk(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE)
+
+birds_rebalancedRF_PhyLatent <- woodedWalk(birds, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE)
+
+birds_rebalancedRF_Trio <- woodedWalk(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE)
+
+AUC_birds_rebalancedRF_Latent_SVD <- roc(data=birds_rebalancedRF_Latent$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_Latent_SVD)
+AUC_birds_rebalancedRF_Latent_SVD
+
+
+AUC_birds_rebalancedRF_TraitsLatent_SVD <- roc(data=birds_rebalancedRF_TraitsLatent$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_TraitsLatent_SVD)
+AUC_birds_rebalancedRF_TraitsLatent_SVD
+
+AUC_birds_rebalancedRF_PhyLatent_SVD <- roc(data=birds_rebalancedRF_PhyLatent$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_PhyLatent_SVD)
+AUC_birds_rebalancedRF_PhyLatent_SVD
+
+AUC_birds_rebalancedRF_Trio_SVD <- roc(data=birds_rebalancedRF_Trio$test, response=real, predictor=S)
+plot(AUC_birds_rebalancedRF_Trio_SVD)
+AUC_birds_rebalancedRF_Trio_SVD
+```
+Making some more plots
+
+
 
 ```{r}
-hist(degree_distribution(batweb))
-degree_distribution(batweb)
-
-hist(degree(batweb))
-hist(degree(birdweb))
-hist(degree(web))
-max(degree(web))
-
-bats %>% select(., Plant_Species, Frugivore_Species) %>% unique()
-
-x <- degree(web)
-which.max(x)
-
-hist(degree(web)[degree(web)!=1])
+birds_rebalancedRF_accuracy <- data.frame(rbind(unlist(getAccurate(birds_rebalancedRF_Phy)),
+      unlist(getAccurate(birds_rebalancedRF_Traits)),
+      unlist(getAccurate(birds_rebalancedRF_Latent)),
+      unlist(getAccurate(birds_rebalancedRF_PhyTraits)),
+      unlist(getAccurate(birds_rebalancedRF_TraitsLatent)),
+      unlist(getAccurate(birds_rebalancedRF_PhyLatent)),
+      unlist(getAccurate(birds_rebalancedRF_Trio))))
 ```
 
