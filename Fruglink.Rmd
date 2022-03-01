@@ -155,21 +155,6 @@ plot(Bird_trees$tree_2110, show.tip.label=FALSE)
 ```
 
 
-Subsampling our graph into training and test set. Deleting edges from our original graph lets us preserve our full adjacency matrix-if we take out entries from our dataframe instead we have problems later on in about predicting out of bounds. 
-
-```{r graph subsampling workflow, eval=FALSE}
-set.seed(24601)
-
-test_web <- igraph::delete.edges(web, sample(1:length(E(web)), 3658, replace = FALSE)) #remove 50% of our data
-#plot(web, layout=layout_as_bipartite(web))
-#plot(test_web, layout=layout_as_bipartite(test_web))
-
-test_adj <- get.adjacency(test_web, type="both", sparse = FALSE)
-
-#lattice::levelplot(test_adj)
-isSymmetric.matrix(test_adj)
-```
-
 In order to get it working with plug and play, we need to turn our categorical variables into binary ones
 ```{r factors to binary}
 dat <- dplyr::filter_at(dat, vars(Plant_Form, Frugivory_score, Lipid_Score, Fruit_color, Plant_origin), all_vars(!is.na(.))) #make sure we have scores for all our binary variables
@@ -242,87 +227,13 @@ dat <- left_join(dat, frug_PhyEig, by="Frugivore_Species")
 ```
 
 
-Functionalizing Plug n Play
-```{r functionalizing PlugNPlay}
-
-#' Plug and Play algorithm. 
-#' Applies the plug and play algorithm to data on environmental covariates at presence and background using multivariate Gaussian distribution for f and f1
-#'
-#'  @param dat input dataframe of plant-frugivore interactions in the format of the atlantic forest csv
-#'  @param FrugTraits Names of columns in dat containing Frugivore traits you'd like to classify with. These must be numeric, with factor entries being converted into a series of binary variables. 
-#'  @param PlantTraits  Names of columns in dat containing Plant traits you'd like to classify with; same conditions as above
-#'  
-#' @returns A list containing: 
-#'  f1 : Estimated Kernal Density of positive training cases
-#'  f0 : Estimated Kernal Density of background training cases
-#'  test :  Edgelist of test set; not informed in train
-#'  train : The edgelist we trained our model on (randomly sampled 80% of total possible edges)
-
-
-pp.kde <- function(dat, FrugTraits, PlantTraits){
-  #Set up our data into a fully expanded edgelist
-  require(tidyr)
-  dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
-  dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
-  full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
-  full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
-  full_real$real[is.na(full_real$real)==TRUE] <- 0
-
-  full_real_frugs <- dat[,c("Frugivore_Species", FrugTraits)] %>% unique() %>% left_join(full_real, ., by="Frugivore_Species") #Add in our frugivore traits
-
-  full_real_both <- dat[,c("Plant_Species", PlantTraits)] %>% unique() %>% left_join(full_real_frugs, ., by="Plant_Species") #add in our plant traits
-  
-  # Subsample our edgelist
-  sample_IDs <- sample(round(nrow(full_real_both)*0.8), replace=F) #subsample out 80% of our edges. 
-  test <- full_real_both[-sample_IDs,] #assign 80% train set
-  train <- full_real_both[sample_IDs,]
-
-  #set up our data to go into npudens
-  p <- train[(train[,'real'] == 1), 4:ncol(train)] #positives cases (p)
-  bgrd <- train[,4:ncol(train)] #background (positive and negative) cases
-
-  require(np)
-  f1 <- np::npudens(p, bwmethod='normal-reference') 
-  f0 <- np::npudens(bgrd, bwmethod='normal-reference')
-  model=list(f1, f0, test, train)
-  names(model) <- c("f1", "f0", "test", "train")
-  #browser
-  return(model)
-}
-
-
-predict.pp.kde <- function(model, x){
-  require(np)
-  f1 <- fitted(npudens(bws = model$f1$bws, edat = x, bwmethod = 'normal-reference'))
-  f0 <- fitted(npudens(bws = model$f0$bws, edat = x, bwmethod = 'normal-reference'))
-  #browser()
-  return(S = f1/f0)
-}
-```
-
 Now that we're set up for success, let's create our subsets
 ```{r}
 bats <- dplyr::filter(dat, Frug_Group=="Bats")
 birds <- dplyr::filter(dat, Frug_Class=="Aves")
 ```
 # Apply Plug and Play to Bats
-## Traits - Bats
-```{r PnP on Bat Traits}
-bats_kde <- pp.kde(bats, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green"))
-#Predictors include continuous variables plus plant form and lipid score
-table(bats$palm)
-bats_kde$test$S <- predict.pp.kde(model=bats_kde, x=bats_kde$test[,4:ncol(bats_kde$test)]) #Predict on test set and assign suitability scores
 
-AUC_BatsTraits <- roc(data=bats_kde$test, response=real, predictor=S)
-plot(AUC_BatsTraits)
-AUC_BatsTraits
-
-FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"); PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
-
-#FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size"); PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green")
-
-apply(bats, MARGIN=2, table)
-```
   
 ## Phylogeny - Bats
   
@@ -338,35 +249,13 @@ frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Fr
 bats_temp <- left_join(bats, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
 bats <- bats_temp
 ```
-  
-Run it
-```{r PnP on Bat Phylogeny}
-batsPhylo_kde <- pp.kde(bats_temp, FrugTraits = c("fc1", "fc2", "fc3", "fc4"), PlantTraits = c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp"))
-#Predictors include continuous variables plus plant form and lipid score
 
-batsPhylo_kde$test$S <- predict.pp.kde(model=batsPhylo_kde, x=batsPhylo_kde$test[,4:ncol(batsPhylo_kde$test)]) #Predict on test set and assign suitability scores
-
-AUC_BatsPhylo <- roc(data=batsPhylo_kde$test, response=real, predictor=S)
-plot(AUC_BatsPhylo)
-AUC_BatsPhylo
-```
 
   
   
 
 ### Apply Plug and Play to Birds
 
-## Traits - Birds
-This takes a bit (~5min or so on my machine)
-```{r PnP on Bird Traits}
-birds_kde <- pp.kde(birds, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3"))#Predictors include continuous variables plus plant form and lipid score
-
-birds_kde$test$S <- predict.pp.kde(model=birds_kde, x=birds_kde$test[,4:ncol(birds_kde$test)]) #Predict on test set and assign suitability scores
-
-AUC_birdsTraits <- roc(data=birds_kde$test, response=real, predictor=S)
-plot(AUC_birdsTraits)
-AUC_birdsTraits
-```
 ## Phylogeny - Birds
   
 ```{r Setup Bird phylogeny}
@@ -381,32 +270,7 @@ frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Fr
 birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
 birds <- birds_temp
 ```
-  
-Run it
-```{r PnP on Bird Phylogeny}
-birdsPhylo_kde <- pp.kde(birds_temp, FrugTraits = c("fc1", "fc2", "fc3"), PlantTraits = c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp"))
-#Predictors include continuous variables plus plant form and lipid score
 
-birdsPhylo_kde$test$S <- predict.pp.kde(model=birdsPhylo_kde, x=birdsPhylo_kde$test[,4:ncol(birdsPhylo_kde$test)]) #Predict on test set and assign suitability scores
-
-AUC_BirdsPhylo <- roc(data=birdsPhylo_kde$test, response=real, predictor=S)
-plot(AUC_BirdsPhylo)
-AUC_BirdsPhylo
-```
-That looks terrible. Why does it?
-
-```{r plot our results so far}
-#pdf(file="PlugPlayTestAUC.pdf", height = 8.5, width=11)
-par(mfrow=c(2,2))
-plot(AUC_BatsTraits, main="Plug & Play Trait AUC; Bats")
-mtext(paste("AUC", round(AUC_BatsTraits$auc, 3), sep="="), side=1)
-plot(AUC_BatsPhylo, main="Plug & Play PhyloDecomposition AUC; Bats")
-mtext(paste("AUC", round(AUC_BatsPhylo$auc, 3), sep="="), side=1)
-plot(AUC_birdsTraits, main="Plug & Play Trait AUC; Birds")
-mtext(paste("AUC", round(AUC_birdsTraits$auc, 3), sep="="), side=1)
-plot(AUC_BirdsPhylo, main="Plug & Play PhyloDecomposition AUC; Birds")
-mtext(paste("AUC", round(AUC_BirdsPhylo$auc, 3), sep="="), side=1)
-```
 Latent Link Prediction Methods
 
 Tad's Method
@@ -434,28 +298,10 @@ dat <- vegstuff(dat)
 ```{r}
 #bats <- dplyr::filter(dat, Frug_Group=="Bats") %>% dplyr::select(., -frugSim, -plantSim)
 bats <- vegstuff(bats)
-
-bats_vegdist_kde <- pp.kde(bats, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
-#Predictors include continuous variables plus plant form and lipid score
-bats_vegdist_kde$test$S <- predict.pp.kde(model=bats_vegdist_kde, x=bats_vegdist_kde$test[,4:ncol(bats_vegdist_kde$test)]) #Predict on test set and assign suitability scores
-
-AUC_BatsVegdist <- roc(data=bats_vegdist_kde$test, response=real, predictor=S)
-plot(AUC_BatsVegdist)
-AUC_BatsVegdist
 ```
-
-Woah, this actually works super well with birds!
 ```{r}
 #birds <- dplyr::filter(dat, Frug_Class=="Aves") %>% dplyr::select(., -frugSim, -plantSim)
 birds <- vegstuff(birds)
-
-birds_vegdist_kde <- pp.kde(birds, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
-#Predictors include continuous variables plus plant form and lipid score
-birds_vegdist_kde$test$S <- predict.pp.kde(model=birds_vegdist_kde, x=birds_vegdist_kde$test[,4:ncol(birds_vegdist_kde$test)]) #Predict on test set and assign suitability scores
-
-AUC_birdsVegdist <- roc(data=birds_vegdist_kde$test, response=real, predictor=S)
-plot(AUC_birdsVegdist)
-AUC_birdsVegdist
 ```
 
 
