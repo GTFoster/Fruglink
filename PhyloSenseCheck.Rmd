@@ -33,7 +33,7 @@ colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol
 sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1])
 
 
-pdf(file="Plant_PhyloDecom_Plot.pdf")
+#pdf(file="Plant_PhyloDecom_Plot.pdf")
 par(mfrow=c(3,2))
 for(i in 1:5){
 plotTree.wBars(BIEN_subtree, setNames(plant_PhyEig[,i+1], plant_PhyEig$Plant_Species), fsize=100, scale=1000, tip.labels=F, lwd=1, width=0.001)
@@ -51,7 +51,7 @@ bat_PhyEig <-data.frame(Mammal_trees[[1]]$tip.label, bat_bones@Eigen$vectors[,1:
 colnames(bat_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3", "fc4")
 
 
-pdf(file="Bat_PhyloDecom_Plot.pdf")
+#pdf(file="Bat_PhyloDecom_Plot.pdf")
 par(mfrow=c(2,2))
 for(i in 1:4){
 plotTree.wBars(Mammal_trees[[1]], setNames(bat_PhyEig[,i+1], bat_PhyEig$Frugivore_Species), fsize=100, scale=100, tip.labels=F, lwd=1, width=0.001)

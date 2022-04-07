@@ -11,7 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
-
 dat <- birds
 
 woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, output_type="predictions"){
@@ -327,7 +326,7 @@ selection_0 <- dplyr::filter(selection, real==0) %>% dplyr::select(., -sum, -rea
 
 hist(selection$Trio)
 
-heatmap(as.matrix(selection_0), Rowv = NA, Colv=NA)
+heatmap(as.matrix(selection_0))
 ```
 
 Variable importance
@@ -458,7 +457,7 @@ levels(output_niceName$Variable)[match("FrugScore3",levels(output_niceName$Varia
 ```
 
 ```{r}
-pdf(file="VarImportance.pdf", width=11, height=11)
+#pdf(file="VarImportance.pdf", width=11, height=11)
 ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
   scale_fill_manual(values = c("Phy_rf" = "#E411E0",
                                 "Traits_rf" = "#E0E411",
@@ -473,7 +472,7 @@ ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, fill=model))+ge
 
 
 ```{r}
-pdf(file="VarImportanceDots.pdf", width=11, height=11)
+#pdf(file="VarImportanceDots.pdf", width=11, height=11)
 ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, col=model))+geom_point(size=5)+theme_classic()+
   scale_color_manual(values = alpha(c("Phy_rf" = "#E411E0",
                                 "Traits_rf" = "#E0E411",
@@ -481,7 +480,7 @@ ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, col=model))+geo
                                 "PhyTraits_rf" = "#E27B79",
                                 "TraitsLatent_rf" = "#79E27B",
                                 "PhyLatent_rf" = "#7B79E2",
-                                "Trio_rf" = "#56549e"
+                                "Trio_rf" = "#000000"
                                 ), 0.5))+
     theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
 ```

@@ -19,10 +19,12 @@ library(np)
 library(PVR)
 library(ape)
 library(phytools)
+library(tictoc)
 ```
 
 
 ```{r read in data}
+tic()
 dat <- read.csv("Data.nosync/ATLANTIC_frugivory.csv")
 dat %<>% filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
@@ -30,7 +32,7 @@ dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precisio
 dat %<>% unique(.)
 ```
 
-```{r set up igraph network}
+```{r set up igraph network eval=FALSE}
 
 web <- data.frame(
     from = dat$Frugivore_Species,
@@ -81,10 +83,6 @@ ggplot(plot_data, aes(x = from, y = to)) +
 
 # I need a phylogeny for my species
 
-The frugivore one I get from tree of life is ok, but the plant one kind of sucks-huge polytomies at really pretty high taxonomic levels. 
-
-Let's get a better plant phylogeny than the one we're working with. 
-
 ```{r trimming overall BIEN plant trees, eval=FALSE}
 plant_list <- unique(dat$Plant_Species)
 plant_list <- gsub(" ","_", plant_list)
@@ -131,7 +129,6 @@ Bird_List <- gsub(" ", "_", Bird_List[,1])
 Bird_List[Bird_List %in% Bird_trees$tree_2110$tip.label==FALSE] #mammals not in our phylogeny
 length(Bird_List)
 length(Bird_List[Bird_List %in% Bird_trees$tree_2110$tip.label==FALSE])
-242-10
 ```
 
 
@@ -183,10 +180,8 @@ dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Fruit_color, values
 dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Plant_origin, values_from = bin)
 
 
-
 dat[, which(colnames(dat)=="liana"):ncol(dat)][is.na(dat[,which(colnames(dat)=="liana"):ncol(dat)])==TRUE] <- 0 #Replae all NA's in our newly created columns with 0
 
-colnames(dat)[32]
 dat <- left_join(dat, dat_old) #add back in our factor columns just in case we want them later
 ```
 
@@ -254,10 +249,7 @@ bats <- bats_temp
   
   
 
-### Apply Plug and Play to Birds
-
-## Phylogeny - Birds
-  
+Adding in the Bird Phylogeny  
 ```{r Setup Bird phylogeny}
 frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[5]], type="newick", scale=TRUE)
 
@@ -305,41 +297,10 @@ birds <- vegstuff(birds)
 ```
 
 
-
-
-
-full data
-```{r}
-full_vegdist_kde <- pp.kde(dat, FrugTraits = c("frugSim"), PlantTraits = c("plantSim"))
-#Predictors include continuous variables plus plant form and lipid score
-full_vegdist_kde$test$S <- predict.pp.kde(model=full_vegdist_kde, x=full_vegdist_kde$test[,4:ncol(full_vegdist_kde$test)]) #Predict on test set and assign suitability scores
-
-AUC_fullVegdist <- roc(data=full_vegdist_kde$test, response=real, predictor=S)
-plot(AUC_fullVegdist)
-AUC_fullVegdist
-```
-
-
-```{r}
-#pdf(file="PlugPlayVegDistAUC.pdf", height = 11, width=8.5)
-par(mfrow=c(3,1))
-plot(AUC_birdsVegdist, main="Plug & Play Vegdist AUC; Full")
-mtext(paste("AUC", round(AUC_birdsVegdist$auc, 3), sep="="), side=1)
-plot(AUC_fullVegdist, main="Plug & Play Vegdist AUC; Birds")
-mtext(paste("AUC", round(AUC_fullVegdist$auc, 3), sep="="), side=1)
-plot(AUC_BatsVegdist, main="Plug & Play Vegdist AUC; Bats")
-mtext(paste("AUC", round(AUC_BatsVegdist$auc, 3), sep="="), side=1)
-```
-
-
-
-
 I've also set up some of the spectral decomposition stuff in another .rmd in the repository.
 
 Now, let's try some random forest models. 
 
-
-desmos::evaluate()
 ```{r}
 woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3){
   #Set up our data into a fully expanded edgelist
@@ -392,11 +353,6 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, bala
   model=list(rfModel=rf,test=test, train=train)
   return(model)
 }
-
-dat
-dat_real <- dat
-dat <- dat_real
-balance_ratio <- 3
 ```
 
 ## Apply Random forest to Bats
@@ -461,26 +417,8 @@ AUC_RF_BatsVegdist
 ```
 
 
-Birds Random Forest vs PPE
-```{r}
-#pdf(file = "Birds_PPEvsRF.pdf", height = 11, width=8.5)
-par(mfrow=c(3,2))
-plot(AUC_birdsTraits, main="Plug & Play Traits ROC; Birds")
-mtext(paste("AUC", round(AUC_birdsTraits$auc, 3), sep="="), side=1)
-plot(AUC_RF_BirdsTraits, main="Random Forest Traits ROC; Birds")
-mtext(paste("AUC", round(AUC_RF_BirdsTraits$auc, 3), sep="="), side=1)
-plot(AUC_BirdsPhylo, main="Plug & Play Phylo ROC; Birds")
-mtext(paste("AUC", round(AUC_BirdsPhylo$auc, 3), sep="="), side=1)
-plot(AUC_RF_BirdsPhylo, main="Random Forest Phylo ROC; Birds")
-mtext(paste("AUC", round(AUC_RF_BirdsPhylo$auc, 3), sep="="), side=1)
-plot(AUC_birdsVegdist, main="Plug & Play Vegdist(Latent) ROC; Birds")
-mtext(paste("AUC", round(AUC_birdsVegdist$auc, 3), sep="="), side=1)
-plot(AUC_RF_BirdsVegdist, main="Random Forest Vegdist(Latent) ROC; Birds")
-mtext(paste("AUC", round(AUC_RF_BirdsVegdist$auc, 3), sep="="), side=1)
-```
 
-Bats Random Forest vs PPE
-```{r}
+
 #pdf(file = "Bats_PPEvsRF.pdf", height = 11, width=8.5)
 par(mfrow=c(3,2))
 plot(AUC_BatsTraits, main="Plug & Play Traits ROC; Bats")
@@ -495,7 +433,7 @@ plot(AUC_BatsVegdist, main="Plug & Play Vegdist(Latent) ROC; Bats")
 mtext(paste("AUC", round(AUC_BatsVegdist$auc, 3), sep="="), side=1)
 plot(AUC_RF_BatsVegdist, main="Random Forest Vegdist(Latent) ROC; Bats")
 mtext(paste("AUC", round(AUC_RF_BatsVegdist$auc, 3), sep="="), side=1)
-```
+
 
 #Comparisons
 First, put our info types in boxes for ease of use
@@ -598,34 +536,7 @@ plot(AUC_bats_rf_Trio, main="RF Trio ROC; bats")
 mtext(paste("AUC", round(AUC_bats_rf_Trio$auc, 3), sep="="), side=1)
 ```
 
-Fancy Plot: Birds
 
-
-
-{r}
-
-#' computes a multitude of accuracy measures, because people love to quibble about accuracy.
-#' @param preds model predictions for vector-virus pair suitability
-#' @param acts binary variable representing known interaction between vector and virus
-#' @param threshold threshold for the H statistic. default = 0.5
-#'
-#' @return a list object of measures (some are `nrow(data)` long, others are 1 value)
-
-getAccuracy<- function(preds, acts, threshold=0.5){
-  require(ROCR); require(hmeasure)
-  acts <- unlist(acts)
-  auc <- unlist(ROCR::performance(ROCR::prediction(preds,acts),'auc')@y.values)
-  hmeas <- hmeasure::HMeasure(acts, preds, threshold=threshold)$metrics$H
-	mrse <- sqrt(sum((preds-acts)**2))
-	acc <- max(unlist(ROCR::performance(ROCR::prediction(preds,acts),'acc')@y.values))
-
-  return(c(
-		acc=acc,
-		auc=auc,
-		mrse=mrse,
-		H=hmeas
-  ))
-}
 ```{r}
 getAccurate<- function(rfob, threshold=0.5){
   require(ROCR); require(hmeasure)
@@ -676,9 +587,7 @@ pivot_longer(temp, 1:4, names_to = "stat") %>% ggplot(data=., aes(fill=stat, y=v
 ```{r}
 ggplot(data=birds_rf_accuracy, aes(x=m, y=H))+geom_bar(aes(y=H), stat="identity", position=position_dodge())+geom_bar(aes(y=acc), stat="identity", position=position_dodge(0.9))
 
-
-pivot_longer(birds_rf_accuracy, 1:4, names_to = "stat") 
-
+birds_rf_accuracy[,1:4] <- lapply(birds_rf_accuracy[,1:4], as.numeric)
  
 # Grouped
 
@@ -709,48 +618,6 @@ bats_rf_accuracy <- data.frame(rbind(unlist(getAccurate(bats_rf_traits)),
 makeComPlot(bats_rf_accuracy)
 ```
 
-
-```{r}
-birds_kde_PhyTraits <- pp.kde(birds, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits))
-birds_kde_PhyTraits$test$S <- predict.pp.kde(model=birds_kde_PhyTraits, x=birds_kde_PhyTraits$test[,4:ncol(birds_kde_PhyTraits$test)])
-
-birds_kde_TraitsLatent <- pp.kde(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
-birds_kde_TraitsLatent$test$S <- predict.pp.kde(model=birds_kde_TraitsLatent, x=birds_kde_TraitsLatent$test[,4:ncol(birds_kde_TraitsLatent$test)])
-
-birds_kde_PhyLatent <- pp.kde(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits))
-birds_kde_PhyLatent$test$S <- predict.pp.kde(model=birds_kde_PhyLatent, x=birds_kde_PhyLatent$test[,4:ncol(birds_kdePhyLatent$test)])
-
-birds_rf_Trio <- pp.kde(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits))
-birds_rf_Trio$test$S <- predict.pp.kde(model=birds_rf_Trio, x=birds_rf_Trio$test[,4:ncol(birds_rf_Trio$test)])
-
-
-AUC_birds_kde_TraitsLatent <- roc(data=birds_kde_TraitsLatent$test, response=real, predictor=S)
-plot(AUC_birds_kde_TraitsLatent)
-AUC_birds_kde_TraitsLatent
-
-AUC_birds_kde_PhyTraits <- roc(data=birds_kde_PhyTraits$test, response=real, predictor=S)
-plot(AUC_bats_kde_PhyTraits)
-AUC_bats_kde_PhyTraits
-
-AUC_bats_kde_PhyLatent <- roc(data=bats_kde_PhyLatent$test, response=real, predictor=S)
-plot(AUC_bats_kde_PhyLatent)
-AUC_bats_kde_PhyLatent
-
-AUC_bats_kde_Trio <- roc(data=bats_kde_Trio$test, response=real, predictor=S)
-plot(AUC_bats_kde_Trio)
-AUC_bats_kde_Trio
-
-
-birds_rf_accuracy <- data.frame(rbind(unlist(getAccurate(birds_kde_traits)),
-      unlist(getAccurate(birds_kde_vegdist)),
-      unlist(getAccurate(birds_kde_plylo)),
-      unlist(getAccurate(birds_kde_PhyLatent)),
-      unlist(getAccurate(birds_kde_PhyTraits)),
-      unlist(getAccurate(birds_kde_TraitsLatent))))
-
-#pdf(file="birds_kde_relcomp.pdf", height=8.5, width=11)
-makeComPlot(bats_rf_accuracy)
-```
 Now, I'm redoing this after reducing the class imbalances in the training data
 
 ```{r}
@@ -935,5 +802,6 @@ birds_rebalancedRF_accuracy <- data.frame(rbind(unlist(getAccurate(birds_rebalan
       unlist(getAccurate(birds_rebalancedRF_TraitsLatent)),
       unlist(getAccurate(birds_rebalancedRF_PhyLatent)),
       unlist(getAccurate(birds_rebalancedRF_Trio))))
+
 ```
 
