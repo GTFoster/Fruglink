@@ -4,6 +4,10 @@ install.packages("magrittr")
 install.packages("plyr")
 install.packages("plyr")
 install.packages("ape")
+install.packages("tidyr")
+install.packages("tictoc")
+install.packages("PVR")
+install.packages("tibble")
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #library(tidyverse)
@@ -13,10 +17,13 @@ library(magrittr)
 library(plyr)
 library(dplyr)
 library(ape)
-
-
+library(tidyr)
+library(tictoc)
+library(PVR)
+library(tibble)
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+tictoc::tic()
 dat <- read.csv("Data.nosync/ATLANTIC_frugivory.csv")
 dat %<>% filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
@@ -174,11 +181,19 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, bala
   predictions <- stats::predict(rf, newdata=test, type="prob")
   test$S <- predictions[,2]
   
+  ##########################
+  #Part where we throw a bunch out for ease of replication
+  ##########################
+  roc(test$real, test$S)
+  AUC <- as.numeric(roc(test$real, test$S)$auc)
+  varimports <- rf$importance
+  
   if(returnTestTrain==TRUE){
     model=list(rfModel=rf,test=test, train=train)
   }
   if(returnTestTrain==FALSE){
-    model<- rf
+    #model<- rf
+    model <- list(AUC, varimports)
   }
   return(model)
 }
@@ -215,9 +230,11 @@ for(i in 1:100){
 }
 
 
-save(output, file="ReplicateRF.Rda")
+save(output, file="ReplicateRFsmaller.Rda")
 
+time <- tictoc::toc()
 
+save(time, file="replicateRuntimeob.Rda")
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 output <- data.frame(models[[7]]$importance)
 output$model <- names(models)[7]
