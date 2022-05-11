@@ -224,21 +224,155 @@ save(output, file="ReplicateRF.Rda")
 ```
 
 
-
+Variable importance plot
 ```{r}
-output <- data.frame(models[[7]]$importance)
-output$model <- names(models)[7]
-output <- rownames_to_column(output, var = "Variable")
-  
+temp <- NULL
+for(i in 1:100){
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Phy[[2]], model="Phy", run=i, trait=rownames(output[[i]]$Phy[[2]])))
 
-for(i in 1:6){
-  temp <- data.frame(models[[i]]$importance)
-  temp$model <- names(models)[i]
-  temp <- rownames_to_column(temp, var = "Variable")
-  output <- rbind(output, temp)
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Traits[[2]], model="Traits", run=i, trait=rownames(output[[i]]$Traits[[2]])))
+
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Latent[[2]], model="Latent", run=i, trait=rownames(output[[i]]$Latent[[2]])))
+
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$PhyTraits[[2]], model="PhyTraits", run=i, trait=rownames(output[[i]]$PhyTraits[[2]])))
+
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$TraitsLatent[[2]], model="TraitsLatent", run=i, trait=rownames(output[[i]]$TraitsLatent[[2]])))
+
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$PhyLatent[[2]], model="PhyLatent", run=i, trait=rownames(output[[i]]$PhyLatent[[2]])))
+
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Trio[[2]], model="Trio", run=i, trait=rownames(output[[i]]$Trio[[2]])))
 }
 
-output$MeanDecreaseGini <- as.numeric(output$MeanDecreaseGini)
+varimport <- temp
+
+#varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)/max(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)/MeanDecreaseGini))
+
+varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
+
+varimporSummary$trait %<>% as.factor()
 ```
 
+
+```{r}
+
+Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
+
+colKey <- vector(mode="character", length=nrow(varimporSummary))
+colKey[levels(varimporSummary$trait) %in% c(f_phylo, p_phylo)==TRUE] <- Trio_Colors[1]
+colKey[levels(varimporSummary$trait) %in% c(f_traits, p_traits)==TRUE] <- Trio_Colors[2]
+colKey[levels(varimporSummary$trait) %in% c(f_latent, p_latent)==TRUE] <- Trio_Colors[3]
+
+levels(varimporSummary$trait)[match("Psvd1",levels(varimporSummary$trait))] <- "Plant SVD: Axis 1"
+levels(varimporSummary$trait)[match("Psvd2",levels(varimporSummary$trait))] <- "Plant SVD: Axis 2"
+levels(varimporSummary$trait)[match("Psvd3",levels(varimporSummary$trait))] <- "Plant SVD: Axis 3"
+levels(varimporSummary$trait)[match("Fsvd1",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 1"
+levels(varimporSummary$trait)[match("Fsvd2",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 2"
+levels(varimporSummary$trait)[match("Fsvd3",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 3"
+
+levels(varimporSummary$trait)[match("c1PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 1"
+levels(varimporSummary$trait)[match("c2PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 2"
+levels(varimporSummary$trait)[match("c3PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 3"
+levels(varimporSummary$trait)[match("c4PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 4"
+levels(varimporSummary$trait)[match("fc1",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 1"
+levels(varimporSummary$trait)[match("fc2",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 2"
+levels(varimporSummary$trait)[match("fc3",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 3"
+
+levels(varimporSummary$trait)[match("Frug_Mean_Gape_Size",levels(varimporSummary$trait))] <- "Frugivore Gape Size"
+levels(varimporSummary$trait)[match("Frug_Body_Mass",levels(varimporSummary$trait))] <- "Frugivore Mass"
+levels(varimporSummary$trait)[match("fruit_diameter",levels(varimporSummary$trait))] <- "Fruit Diameter"
+levels(varimporSummary$trait)[match("fruit_length",levels(varimporSummary$trait))] <- "Fruit Length"
+levels(varimporSummary$trait)[match("red",levels(varimporSummary$trait))] <- "Red Fruit"
+levels(varimporSummary$trait)[match("black",levels(varimporSummary$trait))] <- "Black Fruit"
+levels(varimporSummary$trait)[match("green",levels(varimporSummary$trait))] <- "Green Fruit"
+levels(varimporSummary$trait)[match("yellow",levels(varimporSummary$trait))] <- "Yellow Fruit"
+levels(varimporSummary$trait)[match("brown",levels(varimporSummary$trait))] <- "Brown Fruit"
+levels(varimporSummary$trait)[match("tree",levels(varimporSummary$trait))] <- "Tree"
+levels(varimporSummary$trait)[match("palm",levels(varimporSummary$trait))] <- "Palm"
+levels(varimporSummary$trait)[match("liana",levels(varimporSummary$trait))] <- "Liana"
+levels(varimporSummary$trait)[match("scrub",levels(varimporSummary$trait))] <- "Scrub"
+
+levels(varimporSummary$trait)[match("LipScore1",levels(varimporSummary$trait))] <- "Low Lipid Content Fruit"
+levels(varimporSummary$trait)[match("LipScore2",levels(varimporSummary$trait))] <- "Mid Lipid Content Fruit"
+levels(varimporSummary$trait)[match("LipScore3",levels(varimporSummary$trait))] <- "High Lipid Content Fruit"
+
+levels(varimporSummary$trait)[match("FrugScore1",levels(varimporSummary$trait))] <- "Occasional Frugivore"
+levels(varimporSummary$trait)[match("FrugScore2",levels(varimporSummary$trait))] <- "Facultative Frugivore"
+levels(varimporSummary$trait)[match("FrugScore3",levels(varimporSummary$trait))] <- "Strict Frugivore"
+
+
+
+```
+
+```{r}
+varimporSummary$trait %<>% as.factor()
+
+varimporSummary$model <- as.factor(varimporSummary$model)
+
+trio <- varimporSummary %>% dplyr::filter(., model=="Trio")
+varimporSummary$trait <- factor(varimporSummary$trait, levels=trio[order(trio$avg),]$trait)
+
+
+#pdf(file="VarImportance_ErrBars.pdf", width=11, height=11)
+ggplot(data=varimporSummary, aes(y=trait, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
+  scale_fill_manual(values = alpha(c("Phy" = "#E411E0",
+                                "Traits" = "#E0E411",
+                                "Latent" = "#11E0E4",
+                                "PhyTraits" = "#E27B79",
+                                "TraitsLatent" = "#79E27B",
+                                "PhyLatent" = "#7B79E2",
+                                "Trio" = "#000000"
+                                ), 1.0))+
+  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2,
+                 position=position_dodge(.9))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+
+pdf(file="VarImportance_Dots_ErrBars.pdf", width=11, height=11)
+ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)+theme_classic()+
+  scale_color_manual(values = alpha(c("Phy" = "#E411E0",
+                                "Traits" = "#E0E411",
+                                "Latent" = "#11E0E4",
+                                "PhyTraits" = "#E27B79",
+                                "TraitsLatent" = "#79E27B",
+                                "PhyLatent" = "#7B79E2",
+                                "Trio" = "#000000"
+                                ), 1.0))+
+  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+
+
+
+
+ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, col=model))+geom_point(size=5)+theme_classic()+
+  scale_color_manual(values = alpha(c("Phy_rf" = "#E411E0",
+                                "Traits_rf" = "#E0E411",
+                                "Latent_rf" = "#11E0E4",
+                                "PhyTraits_rf" = "#E27B79",
+                                "TraitsLatent_rf" = "#79E27B",
+                                "PhyLatent_rf" = "#7B79E2",
+                                "Trio_rf" = "#000000"
+                                ), 1.0))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+```
+
+```{r}
+temp <- NULL
+for(i in 1:100){
+temp <- rbind(temp, data.frame(AUC=output[[i]]$Phy[[1]], model="Phy", run=i))
+
+temp <- rbind(temp, data.frame(AUC=output[[i]]$Traits[[1]], model="Traits", run=i))
+
+temp <- rbind(temp, data.frame(AUC=output[[i]]$Latent[[1]], model="Latent", run=i))
+
+temp <- rbind(temp, data.frame(AUC=output[[i]]$PhyTraits[[1]], model="PhyTraits", run=i))
+
+temp <- rbind(temp, data.frame(AUC=output[[i]]$TraitsLatent[[1]], model="TraitsLatent", run=i))
+
+temp <- rbind(temp, data.frame(AUC=output[[i]]$PhyLatent[[1]], model="PhyLatent", run=i))
+
+temp <- rbind(temp, data.frame(AUC=output[[i]]$Trio[[1]], model="Trio", run=i))
+}
+
+Performance <- temp
+PerformanceSummary <- Performance %>% dplyr::group_by(., model) %>% dplyr::summarise(avgAUC=(mean(AUC)), sd=sd((AUC)))
+```
 
