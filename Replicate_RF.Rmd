@@ -19,7 +19,7 @@ library(magrittr)
 
 ```{r}
 dat <- read.csv("Data.nosync/ATLANTIC_frugivory.csv")
-dat %<>% filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size
+dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
 
 dat %<>% unique(.)
@@ -33,28 +33,38 @@ Bird_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugBird/output.nex")
 
 Make Traits Binary
 ```{r}
-dat <- dplyr::filter_at(dat, vars(Plant_Form, Frugivory_score, Lipid_Score, Fruit_color, Plant_origin), all_vars(!is.na(.))) #make sure we have scores for all our binary variables
+
+#dat <- dplyr::filter_at(dat, vars(Plant_Form, Frugivory_score, Lipid_Score, Fruit_color, Plant_origin), all_vars(!is.na(.))) #make sure we have scores for all our binary variables
+
+dat %<>% 
+  filter(
+    across(
+      .cols = c(Plant_Form, Frugivory_score, Lipid_Score, Fruit_color, Plant_origin),
+      .fns = ~ !is.na(.x)
+    )
+  ) #Make sure we have scores for all our binary variables
+
 dat %<>% dplyr::filter(., Fruit_color !="") #This Remove blank fruit color entries
 dat$Plant_origin[dat$Plant_origin !="native"] <- "nonnative" #condense all nonnative plants into one (can revisit later)
 
 #dat$real <- 1 # note that these are real interactions; important when we expand later
 
 dat_old <- dat
-dat$Frugivory_score <- paste("FrugScore", dat$Frugivory_score, sep="") #Make value names unambiguous as column names
-dat$Lipid_Score <- paste("LipScore", dat$Lipid_Score, sep="")
+#dat$Frugivory_score <- paste("FrugScore", dat$Frugivory_score, sep="") #Make value names unambiguous as column names
+#dat$Lipid_Score <- paste("LipScore", dat$Lipid_Score, sep="")
 
 
 categories <- list(Forms=unique(dat$Plant_Form), #take the unique entries of our categorical data and save them in a list; (less typing to assign column names based on them below)
-                   Frugivory_score=unique(dat$Frugivory_score),
-                   Lipid_Score=unique(dat$Lipid_Score),
+                   #Frugivory_score=unique(dat$Frugivory_score),
+                   #Lipid_Score=unique(dat$Lipid_Score),
                    Fruit_color=unique(dat$Fruit_color),
                    Plant_origin=unique(dat$Plant_origin)
                    )
 dat_old <- dat
 
 dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Plant_Form, values_from = bin)
-dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Frugivory_score, values_from = bin)
-dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Lipid_Score, values_from = bin)
+#dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Frugivory_score, values_from = bin)
+#dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Lipid_Score, values_from = bin)
 dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Fruit_color, values_from = bin)
 dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Plant_origin, values_from = bin)
 
@@ -77,23 +87,7 @@ plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plan
 dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
 birds <- dplyr::filter(dat, Frug_Class=="Aves")
 ```
-Vegstuff Function & Add to Birds (Not used right Now!!!)
-```{r}
-vegstuff <- function(dat){
-mat_assym <- as.data.frame.matrix(table(dat$Frugivore_Species, dat$Plant_Species)) #Rows = Frugivores, Columns = Plants
-frugSim <- rowMeans(as.matrix(vegan::vegdist(mat_assym)))	 #What's my average distance from all other frugivores (higher means I'm more unique, lower means I'm more similiar)
-plantSim <- rowMeans(as.matrix(vegan::vegdist(t(mat_assym)))) #Same thing for plants
-simMat <- frugSim %*% t(plantSim)	#uniqueness of the plant * uniqueness of the frugivore
-rownames(simMat) <- rownames(mat_assym)
-data.frame(frugSim) %>% rownames_to_column("Frugivore_Species")
 
-dat <- data.frame(frugSim) %>% rownames_to_column("Frugivore_Species") %>% left_join(dat, by="Frugivore_Species")
-dat_new <- data.frame(plantSim) %>% rownames_to_column("Plant_Species") %>% left_join(dat, by="Plant_Species")
-return(dat_new)
-}
-
-birds <- vegstuff(birds)
-```
 SVD Function & Add to Birds
 ```{r}
 svData <- function(dat){
@@ -220,9 +214,8 @@ for(i in 1:100){
 }
 
 
-save(output, file="ReplicateRF.Rda")
+#save(output, file="ReplicateRF.Rda")
 ```
-
 
 Variable importance plot
 ```{r}
@@ -326,7 +319,7 @@ ggplot(data=varimporSummary, aes(y=trait, x=avg, fill=model))+geom_col(position 
                  position=position_dodge(.9))+
     theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
 
-pdf(file="VarImportance_Dots_ErrBars.pdf", width=11, height=11)
+#pdf(file="VarImportance_Dots_ErrBars.pdf", width=11, height=11)
 ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)+theme_classic()+
   scale_color_manual(values = alpha(c("Phy" = "#E411E0",
                                 "Traits" = "#E0E411",
@@ -338,8 +331,6 @@ ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)
                                 ), 1.0))+
   geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+
     theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
-
-
 
 
 ggplot(data=output_niceName, aes(y=Variable, x=MeanDecreaseGini, col=model))+geom_point(size=5)+theme_classic()+
