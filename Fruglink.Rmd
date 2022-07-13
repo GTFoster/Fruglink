@@ -538,14 +538,14 @@ mtext(paste("AUC", round(AUC_bats_rf_Trio$auc, 3), sep="="), side=1)
 
 
 ```{r}
-getAccurate<- function(rfob, threshold=0.5){
+getAccurate <- function(rfob, threshold=0.5){
   require(ROCR); require(hmeasure)
   
   auc <- roc(data=rfob$test, response=real, predictor=S)$auc
   hmeas <- hmeasure::HMeasure(true.class=rfob$test$real, scores=rfob$test$S)$metrics$H
 	mrse <- sqrt(sum((rfob$test$S-as.numeric(rfob$test$real))^2))
 	acc <- max(unlist(ROCR::performance(ROCR::prediction(rfob$test$S,rfob$test$real),'acc')@y.values))
-
+	
   return(list(
 		acc=acc,
 		auc=auc,
@@ -802,6 +802,5 @@ birds_rebalancedRF_accuracy <- data.frame(rbind(unlist(getAccurate(birds_rebalan
       unlist(getAccurate(birds_rebalancedRF_TraitsLatent)),
       unlist(getAccurate(birds_rebalancedRF_PhyLatent)),
       unlist(getAccurate(birds_rebalancedRF_Trio))))
-
 ```
 
