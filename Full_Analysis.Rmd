@@ -18,7 +18,7 @@ library(BIEN)
 library(np)
 library(PVR)
 library(ape)
-library(phytools)
+library("phytools")
 library(tictoc)
 ```
 
@@ -122,11 +122,11 @@ birds <- svData(birds)
 Add names of the variables 
 ```{r}
 p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
-p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "Lipid_Score")
 p_latent <- c("Psvd1", "Psvd2", "Psvd3")
 
 f_phylo <- c("fc1", "fc2", "fc3")
-f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3")
+f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "Frugivory_score")
 f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
 ```
 
@@ -155,7 +155,7 @@ getAccurate_in <- function(test, threshold=0.5){
 
 Test-Train Split
 ```{r}
-woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, returnTestTrain=FALSE){
+woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, returnTestTrain=FALSE, output_type="performance"){
   #Set up our data into a fully expanded edgelist
   require(tidyr)
   dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
@@ -209,11 +209,13 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, bala
   if(returnTestTrain==FALSE){
     model<- rf
   }
-  return(model)
   
   if(output_type=="performance"){
     output <- getAccurate_in(test)
   return(output)
+  }
+  if(output_type!="performance"){
+  return(model)
   }
 }
 ```
@@ -273,7 +275,7 @@ for(i in 1:100){
   
   rebalancedRF_Phy <- woodedWalk(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE)
   
-  rebalancedRF_Traits <- woodedWalk(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE)
+  rebalancedRF_Traits <- woodedWalk(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE, )
   rebalancedRF_Latent <- woodedWalk(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE)
   rebalancedRF_PhyTraits <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE)
   rebalancedRF_TraitsLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE)
@@ -306,13 +308,13 @@ for(i in 1:100){
   frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
   birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
   
-  rebalancedRF_Phy <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE)
-  rebalancedRF_Traits <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE)
-  rebalancedRF_Latent <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE)
-  rebalancedRF_PhyTraits <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE)
-  rebalancedRF_TraitsLatent <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE)
-  rebalancedRF_PhyLatent <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE)
-  rebalancedRF_Trio <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE)
+  rebalancedRF_Phy <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE, output_type = "predictions")
+  rebalancedRF_Traits <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE, output_type = "predictions")
+  rebalancedRF_Latent <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE, output_type = "predictions")
+  rebalancedRF_PhyTraits <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE, output_type = "predictions")
+  rebalancedRF_TraitsLatent <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE, output_type = "predictions")
+  rebalancedRF_PhyLatent <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE, output_type = "predictions")
+  rebalancedRF_Trio <- woodedWalk_NoSplit(birds_temp, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE, output_type = "predictions")
   
   temp <- list(Phy=rebalancedRF_Phy, 
                Traits=rebalancedRF_Traits,
@@ -325,6 +327,27 @@ for(i in 1:100){
                )
   full_output[[i]] <- temp
 }
-save(split_output, file="fullReplicateRF.Rda")
+save(full_output, file="fullReplicateRF_predicts.Rda")
+```
+
+
+```{r}
+ret <- NULL
+for(i in 1:100){
+  for(j in 1:7){
+    temp <- full_output[[i]][[j]]
+    temp$model <- names(full_output[[i]][j])
+    temp$run <- i
+    ret <- rbind(ret, temp)
+  }
+}
+
+library(magrittr)
+library(dplyr)
+z <- ret %>% group_by(., model, Frugivore_Species, Plant_Species) %>% dplyr::summarise(., avg=mean(S), std=sd(S))
+fullPredictsSummary <- z
+#save(fullPredictsSummary, file="fullNetPredictSummary.Rda")
+write.csv(fullPredictsSummary,"fullNetPredictSummary.csv", row.names = FALSE)
+x <- read.csv("fullNetPredictSummary.csv")
 ```
 
