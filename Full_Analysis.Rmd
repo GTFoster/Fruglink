@@ -351,3 +351,23 @@ write.csv(fullPredictsSummary,"fullNetPredictSummary.csv", row.names = FALSE)
 x <- read.csv("fullNetPredictSummary.csv")
 ```
 
+Temporary
+```{r}
+pred <- read.csv(file="fullNetPredictSummary.csv")
+
+key <- dplyr::select(birds, Frugivore_Species, Plant_Species)
+key$real <- 1
+
+pred <- left_join(pred, key, by = c("Frugivore_Species", "Plant_Species"))
+pred$real[is.na(pred$real)==TRUE] <- 0
+```
+
+
+```{r}
+pred$combo <- paste(pred$Frugivore_Species, pred$Plant_Species, sep="-")
+
+top <- pred %>% dplyr::filter(., model=="Trio" & real==0) %>% top_n(., 100, avg)
+top$combo <- paste(top$Frugivore_Species, top$Plant_Species, sep="-")
+top2 <- pred %>% dplyr::filter(., combo %in% top$combo)
+```
+
