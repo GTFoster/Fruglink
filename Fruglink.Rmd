@@ -193,7 +193,8 @@ Since we have one tree for the plant species, I just do a singular decomposition
 ```{r add plant phylogeny to dat}
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:5]) #first three vectors contain about 42.6% of variation :(
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 42.6% of variation :(
+sum((round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100)[1:3]) #first three vectors contain about 42.6% of variation :(
 
 plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
 colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))

@@ -87,28 +87,28 @@ f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
 
 
 ```{r}
-Phy <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = FALSE)
+Phy <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = FALSE, output_type = "predictions")
 colnames(Phy) <- c("Frugivore_Species", "Plant_Species", "real", "Phy")
 
-Traits <- woodedWalk_NoSplit(birds, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = FALSE)
+Traits <- woodedWalk_NoSplit(birds, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = FALSE, output_type = "predictions")
 colnames(Traits) <- c("Frugivore_Species", "Plant_Species", "real", "Traits")
 
-Latent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = FALSE)
+Latent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = FALSE, output_type = "predictions")
 colnames(Latent) <- c("Frugivore_Species", "Plant_Species", "real", "Latent")
 
 
-PhyTraits <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = FALSE)
+PhyTraits <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = FALSE, output_type = "predictions")
 colnames(PhyTraits) <- c("Frugivore_Species", "Plant_Species", "real", "PhyTraits")
 
-TraitsLatent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = FALSE)
+TraitsLatent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = FALSE, output_type = "predictions")
 colnames(TraitsLatent) <- c("Frugivore_Species", "Plant_Species", "real", "TraitsLatent")
 
 
-PhyLatent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = FALSE)
+PhyLatent <- woodedWalk_NoSplit(birds, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = FALSE, output_type = "predictions")
 colnames(PhyLatent) <- c("Frugivore_Species", "Plant_Species", "real", "PhyLatent")
 
 
-Trio <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = FALSE)
+Trio <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = FALSE, output_type = "predictions")
 colnames(Trio) <- c("Frugivore_Species", "Plant_Species", "real", "Trio")
 
 
@@ -283,19 +283,54 @@ corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, order = "AOE", m
 corr.matrix_unreal <- cor(composite_unreal[,4:10], method="pearson")
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, order = "AOE", main="Pearson: unobserved")
 
-pdf(file="Draft_Figs/fullnetorkcors.pdf", width=8.5, height=11)
+pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
+
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
-corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, order = "AOE", main="Spearman: all")
-corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, order = "AOE", main="Pearson: all")
-corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, order = "AOE", main="Spearman: unobserved")
-corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, order = "AOE", main="Pearson: unobserved")
+corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="Spearman: All Links", mar=c(0,0,2,0), method="ellipse")
+corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, main="Pearson: All Links", mar=c(0,0,2,0), method="ellipse")
+corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Spearman: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
+corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, main="Pearson: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
+
+par(mfrow = c(2, 2), oma=c(0,0,2,0))
+corrplot::corrplot.mixed(spear.matrix_full, lower="number", upper="ellipse", diag=T, main="Spearman: All Links", mar=c(0,0,2,0))
+corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, main="Pearson: All Links", mar=c(0,0,2,0), method="ellipse")
+corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Spearman: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
+corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, main="Pearson: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
+
+dev.off()
 
 
-corrplot::corrplot.mixed(spear.matrix_unreal, 
-	lower='number', upper='circle',
+pdf(file="ESA_Figs/MixedCorrPlots.pdf", width=8.5, height=9.2)
+par(mfrow = c(2, 2), oma=c(0,0,2,0))
+corrplot::corrplot.mixed(spear.matrix_full, 
+	lower='number', upper='ellipse',
 	tl.col=1, 
 	addgrid.col=grey(0.5,0.5), 
-	mar=c(0,0,1,0)
+	mar=c(0,0,2,0), main="Spearman: All Links", tl.pos = "lt",
+	diag = "u"
+)
+
+corrplot::corrplot.mixed(corr.matrix_full, 
+	lower='number', upper='ellipse',
+	tl.col=1, 
+	addgrid.col=grey(0.5,0.5), 
+	mar=c(0,0,2,0), main="Pearson: All Links", tl.pos = "lt",
+	diag = "u"
+)
+corrplot::corrplot.mixed(spear.matrix_unreal, 
+	lower='number', upper='ellipse',
+	tl.col=1, 
+	addgrid.col=grey(0.5,0.5), 
+	mar=c(0,0,2,0), main="Spearman: Unobserved Links", tl.pos = "lt",
+	diag = "u"
+)
+
+corrplot::corrplot.mixed(corr.matrix_unreal, 
+	lower='number', upper='ellipse',
+	tl.col=1, 
+	addgrid.col=grey(0.5,0.5), 
+	mar=c(0,0,2,0), main="Pearson: Unobserved Links", tl.pos = "lt",
+	diag = "u"
 )
 ```
 
