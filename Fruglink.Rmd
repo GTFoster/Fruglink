@@ -193,8 +193,7 @@ Since we have one tree for the plant species, I just do a singular decomposition
 ```{r add plant phylogeny to dat}
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 42.6% of variation :(
-sum((round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100)[1:3]) #first three vectors contain about 42.6% of variation :(
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) 
 
 plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
 colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
@@ -292,6 +291,7 @@ dat <- vegstuff(dat)
 #bats <- dplyr::filter(dat, Frug_Group=="Bats") %>% dplyr::select(., -frugSim, -plantSim)
 bats <- vegstuff(bats)
 ```
+
 ```{r}
 #birds <- dplyr::filter(dat, Frug_Class=="Aves") %>% dplyr::select(., -frugSim, -plantSim)
 birds <- vegstuff(birds)
@@ -363,6 +363,7 @@ Traits - Bats
 bats_rf_traits <- woodedWalk(bats, FrugTraits = c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3"), PlantTraits = c("fruit_diameter", "fruit_length", "tree", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2"))
 #Predictors include continuous variables plus plant form and lipid score
 
+
 AUC_RF_BatsTraits <- roc(data=bats_rf_traits$test, response=real, predictor=S)
 plot(AUC_RF_BatsTraits)
 AUC_RF_BatsTraits
@@ -389,6 +390,7 @@ birds_rf_traits <- woodedWalk(birds, FrugTraits = c("Frug_Body_Mass","Frug_Mean_
 AUC_RF_BirdsTraits <- roc(data=birds_rf_traits$test, response=real, predictor=S)
 plot(AUC_RF_BirdsTraits)
 AUC_RF_BirdsTraits
+
 ```
 ## Phylogeny - Birds
   

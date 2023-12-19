@@ -113,11 +113,11 @@ birds <- svData(birds)
 
 ```{r}
 p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
-p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3")
+p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "Lipid_Score")
 p_latent <- c("Psvd1", "Psvd2", "Psvd3")
 
 f_phylo <- c("fc1", "fc2", "fc3")
-f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "FrugScore1", "FrugScore2", "FrugScore3")
+f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "Frugivory_score")
 f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
 ```
 
@@ -213,27 +213,140 @@ for(i in 1:100){
   output[[i]] <- temp
 }
 
-
 #save(output, file="ReplicateRF.Rda")
 ```
 
 Variable importance plot
+First we need to right some code to jointly find the importance of our one hot encoded variable groups
+```{r}
+#' Summarize Gini impurity score across one-hot encoded variables
+#' Does this by created a weighted mean impurity score, where weight is based on frequency of the variable
+#'
+#' @citation I DID NOT WRITE THIS CODE! Credit to Max Ghenis on Stack Overflow 
+#' https://stats.stackexchange.com/questions/92419/relative-importance-of-a-set-of-predictors-in-a-random-forests-classification-in
+#' 
+#' @param rf.obj Random forest object you want to compute variable importance for
+#' @param groups a list, where each element is a character vector of rownames you want to combine
+#' 
+#' @return A 1 dimensional array, where rownames are the groups of variables and associated values are weighted average importance values (accoring to Gini coefficient)
+#' 
+group.importance <- function(rf.obj, groups) {
+var.share <- function(rf.obj, members) {
+  count <- table(rf.obj$forest$bestvar)[-1]
+  names(count) <- names(rf.obj$forest$ncat)
+  share <- count[members] / sum(count[members])
+  return(share)
+}
+  var.imp <- as.matrix(sapply(groups, function(g) {
+    sum(randomForest::importance(rf.obj, 2)[g, ]*var.share(rf.obj, g))
+  }))
+  colnames(var.imp) <- "MeanDecreaseGini"
+  return(var.imp)
+}
+```
+
+
+Extract importance values from each model. For the models not using traits we can use randomForest::importance() as written, but for traits since we have categorical vars we have to use the above code to group their importance values. 
 ```{r}
 temp <- NULL
 for(i in 1:100){
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$Phy[[2]], model="Phy", run=i, trait=rownames(output[[i]]$Phy[[2]])))
+  # Phy
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Phy$importance, model="Phy", run=i, trait=rownames(output[[i]]$Phy$importance)))
+ # Traits
+traitstemp <- group.importance(rf.obj=output[[i]]$Traits, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score")
+               )
+temp <- rbind(temp, data.frame(giniDec=traitstemp, model="Traits", run=i, trait=rownames(traitstemp)))
+rm(traitstemp)
+ #Latent
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Latent$importance, model="Latent", run=i, trait=rownames(output[[i]]$Latent$importance)))
+ #PhyTraits
+phytraitstemp <- group.importance(rf.obj=output[[i]]$PhyTraits, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlDecomp",
+              Plantphy2="c2PlDecomp",
+              Plantphy3="c3PlDecomp",
+              Plantphy4="c4PlDecomp"))
+temp <- rbind(temp, data.frame(giniDec=phytraitstemp, model="Traits", run=i, trait=rownames(phytraitstemp)))
+rm(phytraitstemp)
+ #TraitsLatent
+traitslatenttemp <- group.importance(rf.obj=output[[i]]$TraitsLatent, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3"))
 
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$Traits[[2]], model="Traits", run=i, trait=rownames(output[[i]]$Traits[[2]])))
-
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$Latent[[2]], model="Latent", run=i, trait=rownames(output[[i]]$Latent[[2]])))
-
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$PhyTraits[[2]], model="PhyTraits", run=i, trait=rownames(output[[i]]$PhyTraits[[2]])))
-
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$TraitsLatent[[2]], model="TraitsLatent", run=i, trait=rownames(output[[i]]$TraitsLatent[[2]])))
-
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$PhyLatent[[2]], model="PhyLatent", run=i, trait=rownames(output[[i]]$PhyLatent[[2]])))
-
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$Trio[[2]], model="Trio", run=i, trait=rownames(output[[i]]$Trio[[2]])))
+temp <- rbind(temp, data.frame(giniDec=traitslatenttemp, model="TraitsLatent", run=i, trait=rownames(traitslatenttemp)))
+rm(traitslatenttemp)
+ #PhyLatent
+phylatenttemp <- group.importance(rf.obj=output[[i]]$PhyLatent, groups=list(
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlDecomp",
+              Plantphy2="c2PlDecomp",
+              Plantphy3="c3PlDecomp",
+              Plantphy4="c4PlDecomp"))
+temp <- rbind(temp, data.frame(giniDec=phylatenttemp, model="Traits", run=i, trait=rownames(phylatenttemp)))
+rm(phylatenttemp)
+ #Trio
+triotemp <- group.importance(rf.obj=output[[i]]$Trio, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlDecomp",
+              Plantphy2="c2PlDecomp",
+              Plantphy3="c3PlDecomp",
+              Plantphy4="c4PlDecomp"))
+temp <- rbind(temp, data.frame(giniDec=triotemp, model="Trio", run=i, trait=rownames(triotemp)))
+rm(traitslatenttemp)
 }
 
 varimport <- temp
@@ -247,52 +360,40 @@ varimporSummary$trait %<>% as.factor()
 
 
 ```{r}
+levels(varimporSummary$trait)[match("p_latent1",levels(varimporSummary$trait))] <- "Plant SVD: Axis 1"
+levels(varimporSummary$trait)[match("p_latent2",levels(varimporSummary$trait))] <- "Plant SVD: Axis 2"
+levels(varimporSummary$trait)[match("p_latent3",levels(varimporSummary$trait))] <- "Plant SVD: Axis 3"
+levels(varimporSummary$trait)[match("f_latent1",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 1"
+levels(varimporSummary$trait)[match("f_latent2",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 2"
+levels(varimporSummary$trait)[match("f_latent3",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 3"
 
-Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
-
-colKey <- vector(mode="character", length=nrow(varimporSummary))
-colKey[levels(varimporSummary$trait) %in% c(f_phylo, p_phylo)==TRUE] <- Trio_Colors[1]
-colKey[levels(varimporSummary$trait) %in% c(f_traits, p_traits)==TRUE] <- Trio_Colors[2]
-colKey[levels(varimporSummary$trait) %in% c(f_latent, p_latent)==TRUE] <- Trio_Colors[3]
-
-levels(varimporSummary$trait)[match("Psvd1",levels(varimporSummary$trait))] <- "Plant SVD: Axis 1"
-levels(varimporSummary$trait)[match("Psvd2",levels(varimporSummary$trait))] <- "Plant SVD: Axis 2"
-levels(varimporSummary$trait)[match("Psvd3",levels(varimporSummary$trait))] <- "Plant SVD: Axis 3"
-levels(varimporSummary$trait)[match("Fsvd1",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 1"
-levels(varimporSummary$trait)[match("Fsvd2",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 2"
-levels(varimporSummary$trait)[match("Fsvd3",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 3"
-
-levels(varimporSummary$trait)[match("c1PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 1"
-levels(varimporSummary$trait)[match("c2PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 2"
-levels(varimporSummary$trait)[match("c3PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 3"
-levels(varimporSummary$trait)[match("c4PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 4"
-levels(varimporSummary$trait)[match("fc1",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 1"
-levels(varimporSummary$trait)[match("fc2",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 2"
-levels(varimporSummary$trait)[match("fc3",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 3"
+levels(varimporSummary$trait)[match("Plantphy1",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 1"
+levels(varimporSummary$trait)[match("Plantphy2",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 2"
+levels(varimporSummary$trait)[match("Plantphy3",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 3"
+levels(varimporSummary$trait)[match("Plantphy4",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 4"
+levels(varimporSummary$trait)[match("FrugPhy1",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 1"
+levels(varimporSummary$trait)[match("FrugPhy2",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 2"
+levels(varimporSummary$trait)[match("FrugPhy3",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 3"
 
 levels(varimporSummary$trait)[match("Frug_Mean_Gape_Size",levels(varimporSummary$trait))] <- "Frugivore Gape Size"
 levels(varimporSummary$trait)[match("Frug_Body_Mass",levels(varimporSummary$trait))] <- "Frugivore Mass"
 levels(varimporSummary$trait)[match("fruit_diameter",levels(varimporSummary$trait))] <- "Fruit Diameter"
 levels(varimporSummary$trait)[match("fruit_length",levels(varimporSummary$trait))] <- "Fruit Length"
-levels(varimporSummary$trait)[match("red",levels(varimporSummary$trait))] <- "Red Fruit"
-levels(varimporSummary$trait)[match("black",levels(varimporSummary$trait))] <- "Black Fruit"
-levels(varimporSummary$trait)[match("green",levels(varimporSummary$trait))] <- "Green Fruit"
-levels(varimporSummary$trait)[match("yellow",levels(varimporSummary$trait))] <- "Yellow Fruit"
-levels(varimporSummary$trait)[match("brown",levels(varimporSummary$trait))] <- "Brown Fruit"
-levels(varimporSummary$trait)[match("tree",levels(varimporSummary$trait))] <- "Tree"
-levels(varimporSummary$trait)[match("palm",levels(varimporSummary$trait))] <- "Palm"
-levels(varimporSummary$trait)[match("liana",levels(varimporSummary$trait))] <- "Liana"
-levels(varimporSummary$trait)[match("scrub",levels(varimporSummary$trait))] <- "Scrub"
-
-levels(varimporSummary$trait)[match("LipScore1",levels(varimporSummary$trait))] <- "Low Lipid Content Fruit"
-levels(varimporSummary$trait)[match("LipScore2",levels(varimporSummary$trait))] <- "Mid Lipid Content Fruit"
-levels(varimporSummary$trait)[match("LipScore3",levels(varimporSummary$trait))] <- "High Lipid Content Fruit"
-
-levels(varimporSummary$trait)[match("FrugScore1",levels(varimporSummary$trait))] <- "Occasional Frugivore"
-levels(varimporSummary$trait)[match("FrugScore2",levels(varimporSummary$trait))] <- "Facultative Frugivore"
-levels(varimporSummary$trait)[match("FrugScore3",levels(varimporSummary$trait))] <- "Strict Frugivore"
+levels(varimporSummary$trait)[match("fruitcolor",levels(varimporSummary$trait))] <- "Fruit Color"
+levels(varimporSummary$trait)[match("growthform",levels(varimporSummary$trait))] <- "Plant Growth Form"
 
 
+levels(varimporSummary$trait)[match("LipidScore",levels(varimporSummary$trait))] <- "Fruit Lipid Content (Categorical)"
+levels(varimporSummary$trait)[match("FrugScore",levels(varimporSummary$trait))] <- "Degree of Frugivory"
+
+
+Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
+
+colKey <- vector(mode="character", length=nrow(varimporSummary))
+colKey <- rep("black",nrow(varimporSummary) )
+colKey[grepl("Phylogeny", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[1] #Phylogeny
+colKey[grepl("SVD", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[3] #Latent
+colKey[grepl("SVD", levels(varimporSummary$trait))==FALSE & grepl("Phylogeny", levels(varimporSummary$trait))==FALSE] <- Trio_Colors[2] #Traits
 
 ```
 
@@ -302,7 +403,7 @@ varimporSummary$trait %<>% as.factor()
 varimporSummary$model <- as.factor(varimporSummary$model)
 
 trio <- varimporSummary %>% dplyr::filter(., model=="Trio")
-varimporSummary$trait <- factor(varimporSummary$trait, levels=trio[order(trio$avg),]$trait)
+varimporSummary$trait2 <- factor(varimporSummary$trait, levels=trio[order(trio$avg),]$trait)
 
 
 #pdf(file="VarImportance_ErrBars.pdf", width=11, height=11)

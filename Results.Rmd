@@ -1,0 +1,74 @@
+---
+title: "Results"
+author: "Your Name"
+date: "2023-11-14"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(igraph)
+library(pROC)
+library(BIEN)
+library(np)
+library(PVR)
+library(ape)
+library("phytools")
+library(tictoc)
+library(corrplot)
+```
+
+```{r}
+load(file="Data.nosync/Models/ttsplitReplicateRF_withJ.Rda") #Loads split_output
+
+load(file="Data.nosync/Models/fullReplicateRF_predicts.Rda") #Louds full output
+
+#load(file="Data.nosync/Models/ttsplitReplicateRF-RFobs.Rda")
+```
+
+Calculating performance metrics for each model type
+```{r}
+performance <- NULL
+for(i in 1:100){
+  for(j in 1:7){
+    temp <- data.frame(model=names(split_output[[i]])[j],
+                          run=i,
+                          acc=split_output[[i]][[j]]$acc,
+                          auc=split_output[[i]][[j]]$auc,
+                          mrse=split_output[[i]][[j]]$mrse,
+                          H=split_output[[i]][[j]]$H)
+    performance <- rbind(performance, temp)
+  }
+}
+
+
+performanceSummary <- performance %>% dplyr::group_by(., model) %>% dplyr::summarise(avg_acc=mean(acc), sd_acc=sd(acc),
+                                                                                avg_auc=mean(auc), sd_auc=sd(auc),
+                                                                                avg_mrse=mean(mrse), sd_mrse=sd(mrse),
+                                                                                avg_H=mean(H), sd_H=sd(H))
+```
+
+```{r}
+pred$combo <- paste(pred$Frugivore_Species, pred$Plant_Species, sep="-")
+
+pred <- pred %>% group_by(., model) %>% dplyr::mutate(., scaled_avg=avg/max(avg, na.rm = TRUE))
+
+key <- dplyr::select(birds, Frugivore_Species, Plant_Species)
+key$real <- 1
+
+pred <- left_join(pred, key, by = c("Frugivore_Species", "Plant_Species"))
+pred$real[is.na(pred$real)==TRUE] <- 0
+
+#top <- pred %>% dplyr::filter(., model=="Trio" & real==0) %>% top_n(., 100, avg)
+
+top <- pred %>% dplyr::filter(., model=="Trio" & real==0) %>% slice_max(., n=300, order_by=scaled_avg)
+
+top$combo <- paste(top$Frugivore_Species, top$Plant_Species, sep="-")
+top2 <- pred %>% dplyr::filter(., combo %in% top$combo)
+```
+
+```{r}
+boxplot(pred$scaled_avg~pred$real)
+```
+

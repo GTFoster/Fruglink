@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
-dat <- birds
+dat <- birdsimportance
 
 woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, output_type="predictions"){
   if((output_type %in% c("rfobject", "predictions"))==FALSE){
@@ -543,6 +543,49 @@ Trio_rf <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo, f_latent, f_traits)
 models <- list("Phy_rf"=Phy_rf, "Traits_rf"=Traits_rf, "Latent_rf"=Latent_rf, "PhyTraits_rf"=PhyTraits_rf, "TraitsLatent_rf"=TraitsLatent_rf, "PhyLatent_rf"=PhyLatent_rf, 
                "Trio_rf"=Trio_rf)
 ```
+
+Joint variable importance aside:
+We need to one hot encode our categorical variables to keep from enforcing some sort of artifical ordination, but we don't want to interpret the importance of each dummy variable individually. If we want to find the importance of the set, we need to find the average of importance weighted  by the frequency of the variable (at least for Gini impurity according to this stack overflow post: https://stats.stackexchange.com/questions/92419/relative-importance-of-a-set-of-predictors-in-a-random-forests-classification-in)
+```{r}
+
+#' Summarize Gini impurity score across one-hot encoded variables
+#' Does this by created a weighted mean impurity score, where weight is based on frequency of the variable
+#'
+#' @citation I DID NOT WRITE THIS CODE! Credit to Max Ghenis on Stack Overflow 
+#' https://stats.stackexchange.com/questions/92419/relative-importance-of-a-set-of-predictors-in-a-random-forests-classification-in
+#' 
+#' @param rf.obj Random forest object you want to compute variable importance for
+#' @param groups a list, where each element is a character vector of rownames you want to combine
+#' 
+#' @return A 1 dimensional array, where rownames are the groups of variables and associated values are weighted average importance values (accoring to Gini coefficient)
+#' 
+group.importance <- function(rf.obj, groups) {
+var.share <- function(rf.obj, members) {
+  count <- table(rf.obj$forest$bestvar)[-1]
+  names(count) <- names(rf.obj$forest$ncat)
+  share <- count[members] / sum(count[members])
+  return(share)
+}
+  var.imp <- as.matrix(sapply(groups, function(g) {
+    sum(randomForest::importance(rf.obj, 2)[g, ]*var.share(rf.obj, g))
+  }))
+  colnames(var.imp) <- "MeanDecreaseGini"
+  return(var.imp)
+}
+
+group.importance(rf.obj=output[[1]]$Traits, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score")
+               )
+
+```
+
 
 ```{r}
 
