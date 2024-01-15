@@ -1,15 +1,8 @@
----
-title: "Reorganized Analysis"
-author: "Grant Foster"
-date: "7/13/2022"
-output: html_document
----
-
-```{r setup, include=FALSE}
+## ----setup, include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE)
-```
 
-```{r}
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library(tidyverse)
 library(magrittr)
 library(igraph)
@@ -21,31 +14,22 @@ library(ape)
 library("phytools")
 library(tictoc)
 library(corrplot)
-```
-
-# Table of Contents
-## 1. Data Handling
-## 2. Set up Randomforest
-## 3. Run Randomforest on Test-train split w/Replicates
-## 4. Run Randomforest on Full Network w/Replicates
 
 
-## 1. Data Handling
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 dat <- read.csv("Data.nosync/ATLANTIC_frugivory.csv")
 dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
 dat %<>% unique(.)
-```
 
-```{r}
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 load("BIEN_subtree.Rda")
 Mammal_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugMam/output.nex")
 Bird_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugBird/output.nex")
-```
 
-Make Traits Binary
-```{r}
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #dat <- dplyr::filter_at(dat, vars(Plant_Form, Frugivory_score, Lipid_Score, Fruit_color, Plant_origin), all_vars(!is.na(.))) #make sure we have scores for all our binary variables
 
 dat %<>% 
@@ -84,9 +68,9 @@ dat <- dat %>% mutate(bin=1) %>% pivot_wider(., names_from = Plant_origin, value
 dat[, which(colnames(dat)=="liana"):ncol(dat)][is.na(dat[,which(colnames(dat)=="liana"):ncol(dat)])==TRUE] <- 0 #Replae all NA's in our newly created columns with 0
 
 dat <- left_join(dat, dat_old) #add back in our factor columns just in case we want them later
-```
-Add Decomposed Plant Phylogeny to dat
-```{r}
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
 sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:5]) #first three vectors contain about 42.6% of variation :(
@@ -98,9 +82,9 @@ plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plan
 
 dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
 birds <- dplyr::filter(dat, Frug_Class=="Aves")
-```
-SVD Function & Add to Birds
-```{r}
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 svData <- function(dat){
 mat_assym <- as.data.frame.matrix(table(dat$Frugivore_Species, dat$Plant_Species)) #Rows = Frugivores, Columns = Plants
 
@@ -119,9 +103,9 @@ dat_new <- left_join(dat_wP, frugSVD, by="Frugivore_Species")
 return(dat_new)
 }
 birds <- svData(birds)
-```
-Add names of the variables 
-```{r}
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
 p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "Lipid_Score")
 p_latent <- c("Psvd1", "Psvd2", "Psvd3")
@@ -129,12 +113,9 @@ p_latent <- c("Psvd1", "Psvd2", "Psvd3")
 f_phylo <- c("fc1", "fc2", "fc3")
 f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "Frugivory_score")
 f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
-```
 
-## 2. Set up Randomforest
 
-This function gets our accuracy measures
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 getAccurate_in <- function(test, threshold=0.5){
   require(ROCR); require(hmeasure)
   
@@ -155,12 +136,9 @@ getAccurate_in <- function(test, threshold=0.5){
 		m=deparse(substitute(rfob)) #return the name of your rfob input
   ))
 }
-```
 
 
-
-RF methods-Test-Train Split
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, returnTestTrain=FALSE, output_type="performance"){
   #Set up our data into a fully expanded edgelist
   require(tidyr)
@@ -224,10 +202,9 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, bala
   return(model)
   }
 }
-```
 
-Same RF framework as above, but this time don't perform a test train split
-```{r}
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, output_type="rfobject"){
   if((output_type %in% c("rfobject", "predictions"))==FALSE){
     stop("Invalid output_type: choices are performance or rfobject")
@@ -264,12 +241,9 @@ woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FAL
   return(output)
   }
 }
-```
 
 
-## 3. Run Randomforest on Test-train split w/Replicates
-Run 100 times!
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 split_output <- list()
 for(i in 1:100){
   #Set up Phylogeny
@@ -301,10 +275,9 @@ for(i in 1:100){
   split_output[[i]] <- temp
 }
 save(split_output, file="Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
-```
-## 4. Run Randomforest on Full Network w/Replicates
-Run 100 times!
-```{r}
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 full_output <- list()
 for(i in 1:100){
   #Set up Phylogeny
@@ -334,11 +307,9 @@ for(i in 1:100){
   full_output[[i]] <- temp
 }
 save(full_output, file="Data.nosync/FullData/fullReplicateRF_predicts.Rda")
-```
 
 
-Rfob Version
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 rf_output <- list()
 for(i in 1:2){
   #Set up Phylogeny
@@ -371,10 +342,9 @@ for(i in 1:2){
 }
 
 save(rf_output, file="Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
-```
 
 
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 performance <- NULL
 for(i in 1:100){
   for(j in 1:7){
@@ -395,18 +365,13 @@ performanceSummary <- performance %>% dplyr::group_by(., model) %>% dplyr::summa
                                                                                 avg_H=mean(H), sd_H=sd(H))
 
 
-```
 
 
-```{r}
-
-```
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
-###################################################################################################################
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 output <- NULL
 for(i in 1:2){
   for(j in 1:7){
@@ -421,11 +386,9 @@ for(i in 1:2){
 rf_output[[1]]
 
 varimporSummary <- output %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
-```
 
 
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
 
@@ -470,11 +433,9 @@ levels(varimporSummary$trait)[match("LipScore3",levels(varimporSummary$trait))] 
 levels(varimporSummary$trait)[match("FrugScore1",levels(varimporSummary$trait))] <- "Occasional Frugivore"
 levels(varimporSummary$trait)[match("FrugScore2",levels(varimporSummary$trait))] <- "Facultative Frugivore"
 levels(varimporSummary$trait)[match("FrugScore3",levels(varimporSummary$trait))] <- "Strict Frugivore"
-```
 
 
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 varimporSummary$trait %<>% as.factor()
 
 varimporSummary$model <- as.factor(varimporSummary$model)
@@ -503,9 +464,9 @@ scale_color_manual(values = alpha(c("Phy" = "#E411E0",
                               ), 1.0))+
 geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+xlab("Gini Importance Score")+ylab("Predictor")+
   theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none", axis.title = element_text(size=20), plot.background = element_rect(fill = "dark grey"))
-```
 
-```{r}
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 temp <- NULL
 for(i in 1:100){
 temp <- rbind(temp, data.frame(AUC=output[[i]]$Phy[[1]], model="Phy", run=i))
@@ -525,52 +486,9 @@ temp <- rbind(temp, data.frame(AUC=output[[i]]$Trio[[1]], model="Trio", run=i))
 
 Performance <- temp
 PerformanceSummary <- Performance %>% dplyr::group_by(., model) %>% dplyr::summarise(avgAUC=(mean(AUC)), sd=sd((AUC)))
-```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###################################################################################################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ret <- NULL
 for(i in 1:100){
   for(j in 1:7){
@@ -588,10 +506,9 @@ fullPredictsSummary <- z
 #save(fullPredictsSummary, file="fullNetPredictSummary.Rda")
 #write.csv(fullPredictsSummary,"fullNetPredictSummary.csv", row.names = FALSE)
 #x <- read.csv("fullNetPredictSummary.csv")
-```
 
-Temporary
-```{r}
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 pred <- read.csv(file="fullNetPredictSummary.csv")
 
 key <- dplyr::select(birds, Frugivore_Species, Plant_Species)
@@ -599,9 +516,9 @@ key$real <- 1
 
 pred <- left_join(pred, key, by = c("Frugivore_Species", "Plant_Species"))
 pred$real[is.na(pred$real)==TRUE] <- 0
-```
 
-```{r}
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 pred$combo <- paste(pred$Frugivore_Species, pred$Plant_Species, sep="-")
 
 pred <- pred %>% group_by(., model) %>% dplyr::mutate(., scaled_avg=avg/max(avg, na.rm = TRUE))
@@ -612,18 +529,16 @@ top <- pred %>% dplyr::filter(., model=="Trio" & real==0) %>% slice_max(., n=300
 
 top$combo <- paste(top$Frugivore_Species, top$Plant_Species, sep="-")
 top2 <- pred %>% dplyr::filter(., combo %in% top$combo)
-```
 
 
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 FrugDegree <- data.frame(table(birds$Frugivore_Species)) %>% dplyr::rename(., "Frugivore_Species"="Var1", "FrugDegree"="Freq")
 PlantDegree <- data.frame(table(birds$Plant_Species)) %>% dplyr::rename(., "Plant_Species"="Var1", "PlantDegree"="Freq")
 top2 <- left_join(top2, FrugDegree, by="Frugivore_Species")
 top2 <- left_join(top2, PlantDegree, by="Plant_Species")
-```
 
 
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library(raster)
 library(rasterVis)
 library(scales)
@@ -638,10 +553,9 @@ long$Plant_Species <- as.factor(long$Plant_Species)
 
 long$Frugivore_Species <- reorder(long$Frugivore_Species, long$FrugDegree)
 long$Plant_Species <- reorder(long$Plant_Species, long$PlantDegree)
-```
 
 
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 comp_raster <- long
 comp_raster$x <- as.numeric(long$Frugivore_Species)
@@ -684,13 +598,9 @@ levelplot(comp_raster$Trio, col.regions=c("white", rev(pal(15))), par.settings =
 rasterVis::levelplot(comp_raster$Trio, col.regions=c("white", rev(viridis::inferno(15))), par.settings = myTheme, scales=list(tck=c(0,0), draw=FALSE), colorkey=FALSE)
 #dev.off()
 
-```
 
 
-
-
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 length(unique(top$Frugivore_Species))
 length(unique(top$Plant_Species))
 table(top$Frugivore_Species)
@@ -702,12 +612,9 @@ top2$combo_fact <- factor(top2$combo, levels=unique(top$combo[order(top$avg)]), 
 
 #pdf(file="test.pdf", height=4, width=12)
 ggplot(data=top2, aes(x=combo_fact, y=scaled_avg, fill=model))+geom_col(position="dodge", stat="identity")
-```
 
 
-
-########################Also not actually fixed...
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 spear.matrix_full <- cor(composite[,4:10], method="spearman")
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, order = "AOE", main="Spearman: all")
 
@@ -769,12 +676,9 @@ corrplot::corrplot.mixed(corr.matrix_unreal,
 	mar=c(0,0,2,0), main="Pearson: Unobserved Links", tl.pos = "lt",
 	diag = "u"
 )
-```
 
 
-Confusion Matrix
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 pred$Eighty5 <- NA
 pred$Eighty5[pred$scaled_avg >0.85] <- 1
 pred$Eighty5[is.na(pred$Eighty5)==TRUE] <- 0
@@ -796,9 +700,9 @@ Fifty_Sum$falseN <- as.numeric(Fifty_Sum$falseN)
 for(i in 1:5){
   Fifty_Sum[i,2:5] <- Fifty_Sum[i,2:5]/sum(Fifty_Sum[i,2:5])
 }
-```
-Matrix 2: Even more confused
-```{r}
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 load("ttsplitReplicateRF_withJ.Rda")
 
 test <- matrix(data=NA, nrow=100, ncol=7)
@@ -812,10 +716,9 @@ for(row in 1:100){
 
 test_sum <- colMeans(test)
 names(test_sum) <- colnames(test)
-```
 
 
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 pred$optimal <- NA
 
 pred$optimal[pred$model=="Phy" & pred$avg > test_sum["Phy"]] <- 1
@@ -850,10 +753,9 @@ for(a in 1:7){
 }
 
 compTable <- as.data.frame(compTable)
-```
 
 
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 colnames(compTable) <- c("Model", "True Positives", "False Positives", "True Negatives", "False Negatives")
 confusion <- compTable %>%
   kbl() %>%
@@ -865,6 +767,4 @@ confusion <- compTable %>%
   kable_classic("striped", full_width = F)
 
 save_kable(confusion, file="Draft_Figs/Confusion_Matrix.pdf")
-```
-
 
