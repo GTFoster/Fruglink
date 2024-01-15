@@ -248,6 +248,8 @@ var.share <- function(rf.obj, members) {
 
 Extract importance values from each model. For the models not using traits we can use randomForest::importance() as written, but for traits since we have categorical vars we have to use the above code to group their importance values. 
 ```{r}
+load("ReplicateRF.Rda")
+
 temp <- NULL
 for(i in 1:100){
   # Phy
