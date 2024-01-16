@@ -311,7 +311,7 @@ save(full_output, file="Data.nosync/FullData/fullReplicateRF_predicts.Rda")
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 rf_output <- list()
-for(i in 1:2){
+for(i in 1:100){
   #Set up Phylogeny
   frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
   frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe

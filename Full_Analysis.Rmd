@@ -340,7 +340,7 @@ save(full_output, file="Data.nosync/FullData/fullReplicateRF_predicts.Rda")
 Rfob Version
 ```{r}
 rf_output <- list()
-for(i in 1:100){
+for(i in 1:2){
   #Set up Phylogeny
   frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
   frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
@@ -370,7 +370,7 @@ for(i in 1:100){
   
 }
 
-save(rf_output, file="Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
+#save(rf_output, file="Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
 ```
 
 ```{r}
@@ -407,6 +407,35 @@ performanceSummary <- performance %>% dplyr::group_by(., model) %>% dplyr::summa
 
 ```
 Variable Importance for Composite Model
+
+```{r}
+#' Summarize Gini impurity score across one-hot encoded variables
+#' Does this by created a weighted mean impurity score, where weight is based on frequency of the variable
+#'
+#' @citation I DID NOT WRITE THIS CODE! Credit to Max Ghenis on Stack Overflow 
+#' https://stats.stackexchange.com/questions/92419/relative-importance-of-a-set-of-predictors-in-a-random-forests-classification-in
+#' 
+#' @param rf.obj Random forest object you want to compute variable importance for
+#' @param groups a list, where each element is a character vector of rownames you want to combine
+#' 
+#' @return A 1 dimensional array, where rownames are the groups of variables and associated values are weighted average importance values (accoring to Gini coefficient)
+#' 
+group.importance <- function(rf.obj, groups) {
+var.share <- function(rf.obj, members) {
+  count <- table(rf.obj$forest$bestvar)[-1]
+  names(count) <- names(rf.obj$forest$ncat)
+  share <- count[members] / sum(count[members])
+  return(share)
+}
+  var.imp <- as.matrix(sapply(groups, function(g) {
+    sum(randomForest::importance(rf.obj, 2)[g, ]*var.share(rf.obj, g))
+  }))
+  colnames(var.imp) <- "MeanDecreaseGini"
+  return(var.imp)
+}
+
+```
+
 
 Starts: Replicate_RF.Rmd line 218 or so
 
@@ -526,6 +555,8 @@ varimport <- temp
 varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
 
 varimporSummary$trait %<>% as.factor()
+
+#save(varimporSummary, file="Data.nosyncVarImportSummary.Rda")
 ```
 
 
