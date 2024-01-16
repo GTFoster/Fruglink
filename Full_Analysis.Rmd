@@ -340,7 +340,7 @@ save(full_output, file="Data.nosync/FullData/fullReplicateRF_predicts.Rda")
 Rfob Version
 ```{r}
 rf_output <- list()
-for(i in 1:2){
+for(i in 1:100){
   #Set up Phylogeny
   frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
   frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
@@ -373,6 +373,17 @@ for(i in 1:2){
 save(rf_output, file="Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
 ```
 
+```{r}
+load("Data.nosync/FullData/fullReplicateRF_predicts.Rda")
+load("Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
+load("Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
+```
+
+```{r}
+
+```
+
+Performance Metrics: After Test-Trait Split
 
 ```{r}
 performance <- NULL
@@ -394,13 +405,205 @@ performanceSummary <- performance %>% dplyr::group_by(., model) %>% dplyr::summa
                                                                                 avg_mrse=mean(mrse), sd_mrse=sd(mrse),
                                                                                 avg_H=mean(H), sd_H=sd(H))
 
+```
+Variable Importance for Composite Model
 
+Starts: Replicate_RF.Rmd line 218 or so
+
+```{r}
+#load("ReplicateRF.Rda")
+
+output <- rf_output
+
+temp <- NULL
+for(i in 1:2){
+  # Phy
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Phy$importance, model="Phy", run=i, trait=c("FrugPhy1", "FrugPhy2", "FrugPhy3", "Plantphy1", "Plantphy2", "Plantphy3","Plantphy4")))
+
+
+ # Traits
+traitstemp <- group.importance(rf.obj=output[[i]]$Traits, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score")
+               )
+temp <- rbind(temp, data.frame(giniDec=traitstemp, model="Traits", run=i, trait=rownames(traitstemp)))
+rm(traitstemp)
+ #Latent
+temp <- rbind(temp, data.frame(giniDec=output[[i]]$Latent$importance, model="Latent", run=i, trait=c("p_latent1", "p_latent2","p_latent3","f_latent1","f_latent2","f_latent3")))
+
+ #PhyTraits
+phytraitstemp <- group.importance(rf.obj=output[[i]]$PhyTraits, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlDecomp",
+              Plantphy2="c2PlDecomp",
+              Plantphy3="c3PlDecomp",
+              Plantphy4="c4PlDecomp"))
+temp <- rbind(temp, data.frame(giniDec=phytraitstemp, model="PhyTraits", run=i, trait=rownames(phytraitstemp)))
+rm(phytraitstemp)
+ #TraitsLatent
+traitslatenttemp <- group.importance(rf.obj=output[[i]]$TraitsLatent, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3"))
+
+temp <- rbind(temp, data.frame(giniDec=traitslatenttemp, model="TraitsLatent", run=i, trait=rownames(traitslatenttemp)))
+rm(traitslatenttemp)
+ #PhyLatent
+phylatenttemp <- group.importance(rf.obj=output[[i]]$PhyLatent, groups=list(
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlDecomp",
+              Plantphy2="c2PlDecomp",
+              Plantphy3="c3PlDecomp",
+              Plantphy4="c4PlDecomp"))
+temp <- rbind(temp, data.frame(giniDec=phylatenttemp, model="PhyLatent", run=i, trait=rownames(phylatenttemp)))
+rm(phylatenttemp)
+ #Trio
+triotemp <- group.importance(rf.obj=output[[i]]$Trio, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlDecomp",
+              Plantphy2="c2PlDecomp",
+              Plantphy3="c3PlDecomp",
+              Plantphy4="c4PlDecomp"))
+temp <- rbind(temp, data.frame(giniDec=triotemp, model="Trio", run=i, trait=rownames(triotemp)))
+rm(traitslatenttemp)
+}
+
+varimport <- temp
+
+#varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)/max(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)/MeanDecreaseGini))
+
+varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
+
+varimporSummary$trait %<>% as.factor()
 ```
 
 
 ```{r}
+levels(varimporSummary$trait)[match("p_latent1",levels(varimporSummary$trait))] <- "Plant SVD: Axis 1"
+levels(varimporSummary$trait)[match("p_latent2",levels(varimporSummary$trait))] <- "Plant SVD: Axis 2"
+levels(varimporSummary$trait)[match("p_latent3",levels(varimporSummary$trait))] <- "Plant SVD: Axis 3"
+levels(varimporSummary$trait)[match("f_latent1",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 1"
+levels(varimporSummary$trait)[match("f_latent2",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 2"
+levels(varimporSummary$trait)[match("f_latent3",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 3"
+
+levels(varimporSummary$trait)[match("Plantphy1",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 1"
+levels(varimporSummary$trait)[match("Plantphy2",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 2"
+levels(varimporSummary$trait)[match("Plantphy3",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 3"
+levels(varimporSummary$trait)[match("Plantphy4",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 4"
+levels(varimporSummary$trait)[match("FrugPhy1",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 1"
+levels(varimporSummary$trait)[match("FrugPhy2",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 2"
+levels(varimporSummary$trait)[match("FrugPhy3",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 3"
+
+levels(varimporSummary$trait)[match("Frug_Mean_Gape_Size",levels(varimporSummary$trait))] <- "Frugivore Gape Size"
+levels(varimporSummary$trait)[match("Frug_Body_Mass",levels(varimporSummary$trait))] <- "Frugivore Mass"
+levels(varimporSummary$trait)[match("fruit_diameter",levels(varimporSummary$trait))] <- "Fruit Diameter"
+levels(varimporSummary$trait)[match("fruit_length",levels(varimporSummary$trait))] <- "Fruit Length"
+levels(varimporSummary$trait)[match("fruitcolor",levels(varimporSummary$trait))] <- "Fruit Color"
+levels(varimporSummary$trait)[match("growthform",levels(varimporSummary$trait))] <- "Plant Growth Form"
+
+
+levels(varimporSummary$trait)[match("LipidScore",levels(varimporSummary$trait))] <- "Fruit Lipid Content (Categorical)"
+levels(varimporSummary$trait)[match("FrugScore",levels(varimporSummary$trait))] <- "Degree of Frugivory"
+
+
+Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
+
+colKey <- vector(mode="character", length=nrow(varimporSummary))
+colKey <- rep("black",nrow(varimporSummary) )
+colKey[grepl("Phylogeny", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[1] #Phylogeny
+colKey[grepl("SVD", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[3] #Latent
+colKey[grepl("SVD", levels(varimporSummary$trait))==FALSE & grepl("Phylogeny", levels(varimporSummary$trait))==FALSE] <- Trio_Colors[2] #Traits
 
 ```
+
+```{r}
+varimporSummary$trait %<>% as.factor()
+
+varimporSummary$model <- as.factor(varimporSummary$model)
+
+trio <- varimporSummary %>% dplyr::filter(., model=="Trio")
+varimporSummary$trait2 <- factor(varimporSummary$trait, levels=trio[order(trio$avg),]$trait)
+
+
+#pdf(file="VarImportance_ErrBars.pdf", width=11, height=11)
+ggplot(data=varimporSummary, aes(y=trait, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
+  scale_fill_manual(values = alpha(c("Phy" = "#E411E0",
+                                "Traits" = "#E0E411",
+                                "Latent" = "#11E0E4",
+                                "PhyTraits" = "#E27B79",
+                                "TraitsLatent" = "#79E27B",
+                                "PhyLatent" = "#7B79E2",
+                                "Trio" = "#000000"
+                                ), 1.0))+
+  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2,
+                 position=position_dodge(.9))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+
+#pdf(file="VarImportance_Dots_ErrBars.pdf", width=11, height=11)
+ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)+theme_classic()+
+  scale_color_manual(values = alpha(c("Phy" = "#E411E0",
+                                "Traits" = "#E0E411",
+                                "Latent" = "#11E0E4",
+                                "PhyTraits" = "#E27B79",
+                                "TraitsLatent" = "#79E27B",
+                                "PhyLatent" = "#7B79E2",
+                                "Trio" = "#000000"
+                                ), 1.0))+
+  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+```
+
 
 
 
@@ -417,8 +620,6 @@ for(i in 1:2){
     output <- rbind(output, temp)
   }
 }
-
-rf_output[[1]]
 
 varimporSummary <- output %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
 ```
