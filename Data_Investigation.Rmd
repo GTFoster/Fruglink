@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+This document is for investigating network data structure (to inform methods), as well as to create a conceptual figure.
+
 ```{r}
 library(tidyverse)
 library(magrittr)
@@ -90,10 +92,111 @@ dplyr::filter(phylospec, mpd.obs.p<0.05) #Number of species more significantly p
 
 ```
 
+Filling in missing data points with AvoNet. 
+Turns out, AvoNet doesn't actually provide gape size. It does have a number of other relate beak size measures, but without some assumptions I can't use those to fill it in. 
 ```{r}
 bm <- birds %>% dplyr::select(., Frugivore_Species, Frug_Body_Mass) %>% unique() %>% dplyr::filter(., is.na(Frug_Body_Mass)==TRUE) %>% dplyr::filter(., grepl(" ", Frugivore_Species)==TRUE)
 
 
 gapes <- birds %>% dplyr::select(., Frugivore_Species, Frug_Mean_Gape_Size) %>% unique() %>% dplyr::filter(., is.na(Frug_Mean_Gape_Size)==TRUE) %>% dplyr::filter(., grepl(" ", Frugivore_Species)==TRUE)
+```
+
+
+```{r}
+birdsp <- birds %>% dplyr::select(., Frugivore_Species, Frug_Mean_Gape_Size, Frug_Body_Mass) %>% unique() %>% dplyr::filter(., grepl(" ", Frugivore_Species)==TRUE)
+Avonet <- read.csv(file="Data.nosync/AvoNet/Avonet1_BirdLife.csv")
+
+Avonet <- Avonet %>% dplyr::filter(., Species1 %in% birdsp$Frugivore_Species) %>% dplyr::select(., Species1, Beak.Length_Nares, Beak.Width, Beak.Depth)
+colnames(Avonet) <- c("Frugivore_Species", "Beak_len", "Beak_wid", "Beak_dep")
+
+birdsp <- left_join(birdsp, Avonet, by="Frugivore_Species")
+
+DL <- lm(formula=Frug_Mean_Gape_Size~Beak_len+Beak_dep, data=birdsp)
+L <- lm(formula=Frug_Mean_Gape_Size~Beak_len, data=birdsp)
+D <- lm(formula=Frug_Mean_Gape_Size~Beak_dep, data=birdsp)
+DL_int <- lm(formula=Frug_Mean_Gape_Size~Beak_len+Beak_dep+Beak_len*Beak_dep, data=birdsp)
+DL_quad <- lm(formula=Frug_Mean_Gape_Size~exp(Beak_len)+Beak_len+Beak_dep, data=birdsp)
+WidL <- lm(formula=Frug_Mean_Gape_Size~Beak_len+Beak_wid, data=birdsp)
+WidLint <- lm(formula=Frug_Mean_Gape_Size~Beak_len+Beak_wid+Beak_len*Beak_wid, data=birdsp)
+
+
+WidInt <- lm(formula=Frug_Mean_Gape_Size~Beak_len+Beak_dep+Beak_wid, data=birdsp)
+
+WidInt2 <- lm(formula=Frug_Mean_Gape_Size~Beak_len+Beak_dep+Beak_wid+Beak_len*Beak_wid, data=birdsp)
+
+extractAIC(L)
+extractAIC(D)
+extractAIC(DL) 
+extractAIC(DL_int)
+extractAIC(DL_quad)
+extractAIC(WidL) 
+extractAIC(WidLint)#Best AIC value
+extractAIC(WidInt)
+extractAIC(WidInt2)
+
+
+birdsp$predGape <- predict(WidL, birdsp)
+
+pdf(file="GapePredictions.pdf")
+plot(x=birdsp$Frug_Mean_Gape_Size, y=birdsp$predGape, xlab="Measured Gape", ylab="Predicted Gape", xlim=c(0,40), ylim=c(0,40))
+abline(a=0, b=1)
+dev.off()
+
+summary(WidL)
+
+plot(WidL)
+
+save(WidL, file="GapeModel.Rda")
+plot(WidL)
+```
+
+Same thing for BIEN
+
+```{r}
+diam <- birds %>% dplyr::select(., Plant_Species, fruit_diameter) %>% unique() %>% dplyr::filter(., is.na(fruit_diameter)==TRUE) %>% dplyr::filter(., grepl(" ", Plant_Species)==TRUE)
+
+len <- birds %>% dplyr::select(., Plant_Species, fruit_length) %>% unique() %>% dplyr::filter(., is.na(fruit_length)==TRUE) %>% dplyr::filter(., grepl(" ", Plant_Species)==TRUE)
+
+birds$Fruit_color[birds$Fruit_color==""] <- NA
+colr <- birds %>% dplyr::select(., Plant_Species, Fruit_color) %>% unique() %>% dplyr::filter(., is.na(Fruit_color)==TRUE) %>% dplyr::filter(., grepl(" ", Plant_Species)==TRUE)
+
+plant_fills <- unique(c(diam$Plant_Species, len$Plant_Species, colr$Plant_Species))
+library(BIEN)
+```
+
+
+```{r}
+read.csv(file="Data.nosync/AvoNet/")
+```
+
+
+Making a conceptual figure
+```{r}
+set.seed(5)
+fsp_ID <- sample(1:length(unique(birds$Frugivore_Species)), size=10, replace=FALSE)
+frugs <- unique(birds$Frugivore_Species)
+
+sNet <- dplyr::filter(birds, Frugivore_Species %in% frugs[fsp_ID]) %>% dplyr::filter(., Frugivore_Species %in% c("Saltator maximus", "Mimus saturninus")==FALSE)
+
+length(unique(sNet$Plant_Species))
+length(unique(sNet$Frugivore_Species))
+
+table(sNet$Frugivore_Species)
+```
+
+
+
+```{r}
+web <- data.frame(
+    from = sNet$Frugivore_Species,
+    to = sNet$Plant_Species
+  ) %>% graph_from_data_frame(directed=FALSE) #Create a graph with all unique plant-frugivore edges
+
+V(web)$type <- c(rep("Frug", 8), rep("Plant",42-8))
+lyt <- layout.bipartite(web, types=c(rep(TRUE, 8), rep(FALSE,42-8)))
+
+
+
+plot(web, layout=lyt)
 ```
 
