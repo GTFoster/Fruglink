@@ -89,7 +89,7 @@ Add Decomposed Plant Phylogeny to dat
 ```{r}
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:5]) #first three vectors contain about 42.6% of variation :(
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 42.6% of variation :(
 
 plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
 colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
@@ -588,51 +588,50 @@ levels(varimporSummary$trait)[match("LipidScore",levels(varimporSummary$trait))]
 levels(varimporSummary$trait)[match("FrugScore",levels(varimporSummary$trait))] <- "Degree of Frugivory"
 
 
-Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
+Trio_Colors <- c("#ff2929", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
 
-colKey <- vector(mode="character", length=nrow(varimporSummary))
-colKey <- rep("black",nrow(varimporSummary) )
-colKey[grepl("Phylogeny", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[1] #Phylogeny
-colKey[grepl("SVD", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[3] #Latent
-colKey[grepl("SVD", levels(varimporSummary$trait))==FALSE & grepl("Phylogeny", levels(varimporSummary$trait))==FALSE] <- Trio_Colors[2] #Traits
+
 
 ```
 
 ```{r}
-varimporSummary$trait %<>% as.factor()
-
 varimporSummary$model <- as.factor(varimporSummary$model)
 
 trio <- varimporSummary %>% dplyr::filter(., model=="Trio")
 varimporSummary$trait2 <- factor(varimporSummary$trait, levels=trio[order(trio$avg),]$trait)
 
+#colKey <- vector(mode="character", length=nrow(varimporSummary))
+colKey <- levels(varimporSummary$trait2)
+colKey[grepl("Phylogeny", colKey)==TRUE] <- Trio_Colors[1]
+colKey[grepl("SVD", colKey)==TRUE] <- Trio_Colors[3]
+colKey[grepl("#", colKey)==FALSE] <- Trio_Colors[2]
 
-#pdf(file="VarImportance_ErrBars.pdf", width=11, height=11)
-ggplot(data=varimporSummary, aes(y=trait, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
-  scale_fill_manual(values = alpha(c("Phy" = "#E411E0",
+pdf(file="VarImportance_ErrBars.pdf", width=11, height=11)
+ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
+  scale_fill_manual(values = alpha(c("Phy" = "#ff2929",
                                 "Traits" = "#E0E411",
                                 "Latent" = "#11E0E4",
-                                "PhyTraits" = "#E27B79",
+                                "PhyTraits" = "#ff9a57",
                                 "TraitsLatent" = "#79E27B",
                                 "PhyLatent" = "#7B79E2",
-                                "Trio" = "#000000"
+                                "Trio" = "#a05a2c"
                                 ), 1.0))+
   geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2,
                  position=position_dodge(.9))+
-    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")+xlab("Gini Importance Score")+ylab("Variable")
 
 #pdf(file="VarImportance_Dots_ErrBars.pdf", width=11, height=11)
-ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)+theme_classic()+
-  scale_color_manual(values = alpha(c("Phy" = "#E411E0",
-                                "Traits" = "#E0E411",
-                                "Latent" = "#11E0E4",
-                                "PhyTraits" = "#E27B79",
-                                "TraitsLatent" = "#79E27B",
-                                "PhyLatent" = "#7B79E2",
-                                "Trio" = "#000000"
-                                ), 1.0))+
-  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+
-    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")
+#ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)+theme_classic()+
+#  scale_color_manual(values = alpha(c("Phy" = "#E411E0",
+#                                "Traits" = "#E0E411",
+#                                "Latent" = "#11E0E4",
+#                                "PhyTraits" = "#E27B79",
+#                                "TraitsLatent" = "#79E27B",
+#                                "PhyLatent" = "#7B79E2",
+#                                "Trio" = "#000000"
+#                                ), 1.0))+
+#  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+
+#    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")+ylab("Gini Importance Score")
 ```
 
 
@@ -899,7 +898,7 @@ pal <- colorRampPalette(c("black", "white"))
 myTheme <- BTCTheme()
 myTheme$panel.background$col = '#f1ecd3'
 
-pdf(file="Draft_Figs/SuitabilityMap.pdf", width=6, height=6)
+#pdf(file="Draft_Figs/SuitabilityMap.pdf", width=6, height=6)
 levelplot(comp_raster, col.regions=c("white", rev(pal(15))), par.settings = myTheme, layout=c(3, 2), scales=list(tck=c(0,0), draw=FALSE))
 dev.off()
 
@@ -940,16 +939,19 @@ ggplot(data=top2, aes(x=combo_fact, y=scaled_avg, fill=model))+geom_col(position
 
 ########################Also not actually fixed...
 ```{r}
-spear.matrix_full <- cor(composite[,4:10], method="spearman")
+composite <-pred %>% dplyr::select(., model, combo, real, scaled_avg)%>% pivot_wider(., names_from="model", values_from=scaled_avg)
+?cor()
+
+spear.matrix_full <- cor(composite[,3:9], method="spearman", use="complete.obs")
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, order = "AOE", main="Spearman: all")
 
-corr.matrix_full <- cor(composite[,4:10], method="pearson")
+corr.matrix_full <- cor(composite[,3:9], method="pearson", use="complete.obs")
 corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, order = "AOE", main="Pearson: all")
 
-spear.matrix_unreal <- cor(composite_unreal[,4:10], method="spearman")
+spear.matrix_unreal <- composite %>% dplyr::filter(., real==1) %>% dplyr::select(., -1, -2) %>% cor(., method="spearman", use="complete.obs")
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, order = "AOE", main="Spearman: unobserved")
 
-corr.matrix_unreal <- cor(composite_unreal[,4:10], method="pearson")
+corr.matrix_unreal <- composite %>% dplyr::filter(., real==1) %>% dplyr::select(., -1, -2) %>% cor(., method="pearson", use="complete.obs")
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, order = "AOE", main="Pearson: unobserved")
 
 pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
@@ -1001,6 +1003,13 @@ corrplot::corrplot.mixed(corr.matrix_unreal,
 	mar=c(0,0,2,0), main="Pearson: Unobserved Links", tl.pos = "lt",
 	diag = "u"
 )
+
+
+pdf(file="ESA_Figs/SpearmanCorplot.pdf", width=8.5, height=6)
+par(mfrow = c(1, 2), oma=c(0,0,2,0))
+corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="All Potential Links", mar=c(0,0,2,0), method="ellipse")
+corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Unobserved Links", mar=c(0,0,2,0), method="ellipse")
+dev.off()
 ```
 
 

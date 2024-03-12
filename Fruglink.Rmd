@@ -211,7 +211,6 @@ frug_litter <- PVR::PVRdecomp(phy=frug_tree, type="newick", scale=TRUE)
 
 round((frug_litter@Eigen$values)/sum((frug_litter@Eigen$values)),3)*100 #first three vectors contain about 33.8% of variation
 
-frug_PhyEig <-data.frame(frug_tree$tip.label, frug_litter@Eigen$vectors[,1:3])
 
 frug_PhyEig %<>% rename(., "Frugivore_Species"=frug_tree.tip.label)
 frug_PhyEig$Frugivore_Species <- gsub("_ott.*","", x=frug_PhyEig$Frugivore_Species)
@@ -753,6 +752,21 @@ return(dat_new)
 
 birds <- svData(birds)
 bats <- svData(bats)
+
+
+"fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "LipScore1", "LipScore2", "LipScore3"
+```
+
+
+```{r}
+
+table(birds$Plant_Form)
+table(birds$Fruit_color)
+#brown included: 12 
+#epiphyte excluded: 34
+
+range(birds$Frug_Body_Mass, na.rm=TRUE)
+range(birds$Frug_Mean_Gape_Size, na.rm=TRUE)
 ```
 
 

@@ -1,0 +1,99 @@
+---
+title: "Data Source Investigation"
+author: "Grant Foster"
+date: "2024-03-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(igraph)
+library(BIEN)
+library(PVR)
+library(ape)
+library("phytools")
+library(picante)
+```
+
+
+```{r}
+dat <- read.csv("Data.nosync/ATLANTIC_frugivory.csv")
+dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
+dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
+dat %<>% unique(.)
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+```
+
+Number of unique species and interactions
+```{r}
+length(unique(dat$Frugivore_Species))
+length(unique(dat$Plant_Species))
+
+length(unique(birds$Frugivore_Species))
+length(unique(birds$Plant_Species))
+```
+
+Degree disributions
+
+```{r}
+hist(table(birds$Frugivore_Species))
+table(table(birds$Frugivore_Species)==1)
+median(table(dat$Frugivore_Species))
+```
+
+
+```{r}
+hist(table(birds$Plant_Species))
+range(table(birds$Plant_Species))
+table(table(birds$Plant_Species)==1)
+median(table(dat$Plant_Species))
+```
+
+
+```{r}
+load("BIEN_subtree.Rda")
+plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
+
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 42.6% of variation :(
+
+plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
+colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
+
+plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
+
+dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
+birds <- dplyr::filter(dat, Frug_Class=="Aves") %>% #Filter to birds
+  dplyr::filter(., grepl(" ", Frugivore_Species)==TRUE) #Filter out any bird records only to the genus level
+```
+
+```{r}
+
+dmatrix <- cophenetic(BIEN_subtree)
+dmatrix <- dmatrix/max(dmatrix)
+
+birds$plant_Tips <- gsub(pattern=" ", replace="_", x=birds$Plant_Species)
+
+birds_phylo<- dplyr::filter(birds, plant_Tips %in% BIEN_subtree$tip.label)
+
+comm <- as.data.frame.matrix(table(birds_phylo$Frugivore_Species, birds_phylo$plant_Tips))
+
+
+test_mpd <- picante::ses.mpd(comm, dmatrix, null.model = "independentswap", abundance.weighted=FALSE, runs = 999, iterations = 1000) 
+
+phylospec <- dplyr::filter(test_mpd, ntaxa > 1)
+dplyr::filter(phylospec, mpd.obs.p<0.05) #Number of species more significantly phylogenetically specialized than a random draw. 
+
+```
+
+```{r}
+bm <- birds %>% dplyr::select(., Frugivore_Species, Frug_Body_Mass) %>% unique() %>% dplyr::filter(., is.na(Frug_Body_Mass)==TRUE) %>% dplyr::filter(., grepl(" ", Frugivore_Species)==TRUE)
+
+
+gapes <- birds %>% dplyr::select(., Frugivore_Species, Frug_Mean_Gape_Size) %>% unique() %>% dplyr::filter(., is.na(Frug_Mean_Gape_Size)==TRUE) %>% dplyr::filter(., grepl(" ", Frugivore_Species)==TRUE)
+```
+

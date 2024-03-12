@@ -85,6 +85,18 @@ f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "Frugivory_score")
 f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
 ```
 
+Temp: Finding the average variance explained by the first 3 eigvectors of each animal tree
+```{r}
+temp <- NULL
+for(i in 1:500){
+  bird_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
+  temp <- rbind(sum((round((bird_litter@Eigen$values)/sum((bird_litter@Eigen$values)),5)*100)[1:3]), temp) #first three vectors contain about 42.6% of variation :(
+}
+
+mean(temp)
+sd(temp)
+```
+
 
 ```{r}
 Phy <- woodedWalk_NoSplit(birds, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = FALSE, output_type = "predictions")
@@ -126,6 +138,22 @@ composite %<>% filter(., is.na(Trio)==FALSE)
 range(table(composite$Frugivore_Species, composite$Plant_Species))
 ```
 
+#Grabbing composite from saved .rda object
+```{r, eval=FALSE}
+load("fullNetPredictSummary.Rda")
+composite <- fullPredictsSummary %>% dplyr::select(., -std) %>% pivot_wider(names_from=model, values_from=avg)
+
+
+
+key <- dat %>% dplyr::select(., Frugivore_Species, Plant_Species) %>% unique() %>% mutate(., real=1)
+
+composite <- left_join(composite, key, by=c("Frugivore_Species", "Plant_Species"))
+
+composite_real <- dplyr::filter(composite, real==1)
+
+cor(composite[,4:ncol(composite)-1], method="spearman", use="pairwise.complete.obs")
+cor(composite_real[,4:ncol(composite_real)-1], method="spearman", use="pairwise.complete.obs")
+```
 
 ```{r}
 cor.matrix <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
@@ -139,7 +167,7 @@ cor.conventional <- composite%>% select(., -Frugivore_Species, -Plant_Species, -
   as.matrix %>%
   cor
 
-spear.matrix <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
+spear.matrix <- composite %>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
   as.matrix %>%
   cor(method="spearman") %>%
   as.data.frame %>%
@@ -149,6 +177,8 @@ spear.matrix <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real
 spear.conventional <- composite%>% select(., -Frugivore_Species, -Plant_Species, -real) %>%
   as.matrix %>%
   cor(method="spearman")
+
+
 ```
 
 
