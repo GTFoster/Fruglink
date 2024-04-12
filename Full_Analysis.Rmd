@@ -550,7 +550,7 @@ rm(traitslatenttemp)
 
 varimport <- temp
 
-#varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)/max(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)/MeanDecreaseGini))
+#varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>%VarImportance_Err dplyr::summarise(avg=(mean(MeanDecreaseGini)/max(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)/MeanDecreaseGini))
 
 varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
 
@@ -606,7 +606,7 @@ colKey[grepl("Phylogeny", colKey)==TRUE] <- Trio_Colors[1]
 colKey[grepl("SVD", colKey)==TRUE] <- Trio_Colors[3]
 colKey[grepl("#", colKey)==FALSE] <- Trio_Colors[2]
 
-pdf(file="VarImportance_ErrBars.pdf", width=11, height=11)
+pdf(file="VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
 ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
   scale_fill_manual(values = alpha(c("Phy" = "#ff2929",
                                 "Traits" = "#E0E411",
@@ -616,9 +616,9 @@ ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position
                                 "PhyLatent" = "#7B79E2",
                                 "Trio" = "#a05a2c"
                                 ), 1.0))+
-  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2,
+  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.1,
                  position=position_dodge(.9))+
-    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")+xlab("Gini Importance Score")+ylab("Variable")
+    theme(axis.text.y = element_text(colour = colKey, size = 8), legend.position = "none")+xlab("Gini Importance Score")+ylab("Variable")+scale_x_continuous(expand=c(0, 0))
 
 #pdf(file="VarImportance_Dots_ErrBars.pdf", width=11, height=11)
 #ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)+theme_classic()+
@@ -940,8 +940,10 @@ ggplot(data=top2, aes(x=combo_fact, y=scaled_avg, fill=model))+geom_col(position
 ########################Also not actually fixed...
 ```{r}
 composite <-pred %>% dplyr::select(., model, combo, real, scaled_avg)%>% pivot_wider(., names_from="model", values_from=scaled_avg)
-?cor()
+```
 
+
+```{r}
 spear.matrix_full <- cor(composite[,3:9], method="spearman", use="complete.obs")
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, order = "AOE", main="Spearman: all")
 
@@ -954,7 +956,7 @@ corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, order = "AOE", m
 corr.matrix_unreal <- composite %>% dplyr::filter(., real==1) %>% dplyr::select(., -1, -2) %>% cor(., method="pearson", use="complete.obs")
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, order = "AOE", main="Pearson: unobserved")
 
-pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
+#pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
 
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="Spearman: All Links", mar=c(0,0,2,0), method="ellipse")
@@ -968,10 +970,10 @@ corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, main="Pearson: All 
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Spearman: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, main="Pearson: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
 
-dev.off()
+#dev.off()
 
 
-pdf(file="ESA_Figs/MixedCorrPlots.pdf", width=8.5, height=9.2)
+#pdf(file="ESA_Figs/MixedCorrPlots.pdf", width=8.5, height=9.2)
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
 corrplot::corrplot.mixed(spear.matrix_full, 
 	lower='number', upper='ellipse',
@@ -1005,11 +1007,11 @@ corrplot::corrplot.mixed(corr.matrix_unreal,
 )
 
 
-pdf(file="ESA_Figs/SpearmanCorplot.pdf", width=8.5, height=6)
+#pdf(file="ESA_Figs/SpearmanCorplot.pdf", width=8.5, height=6)
 par(mfrow = c(1, 2), oma=c(0,0,2,0))
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="All Potential Links", mar=c(0,0,2,0), method="ellipse")
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Unobserved Links", mar=c(0,0,2,0), method="ellipse")
-dev.off()
+#dev.off()
 ```
 
 
