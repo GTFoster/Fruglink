@@ -363,84 +363,41 @@ display: none;
 
 
 <p>#Research Questions: ## 1. How well are we able to predict missing
-frugivory links across diverse taxa? ## 2. How do link prediction
-methods using trait-based, phylogenetic, or latent graph information
-compare? Do they overlap in the kinds of links they tend to get right,
-or can we combine them to be more than the sum of their parts? ## 3.
-Compared to the entire network, are we able to predict better or worse
-on particular taxonomic or functional groups? How about for more
-generalist or specialist nodes? ## 4. If we train network reconstruction
-methods on only native interactions, how do they perform when applied to
-nonnative species?</p>
-<div id="methods" class="section level2">
-<h2>Methods:</h2>
-<p>Using Atlantic Forest data from Bello 2021: (7344 links with native
-plants, 857 nonnative links). Split into test and training sets, and
-train a variety of network reconstruction model types including: a)
-methods agnostic to node biology (preferential-attatchment models,
-hierarchical structure (Clauset 2008) b )Models incorporating
-phylogenetic information (in the style of Elmasri 2020) c) Trait-based
-methods, and d) Combinations of the above.</p>
-<p>Comparing the performance of these competing models using
-network-wide measures of link prediction performance such as AUC will
-allow us to answer research questions 1&amp;2. We can then hopefully
-answer question 3 by comparing the accuracy of particular link sets (ex.
-Can we detect a phylogenetic signal in how well we’re able to predict
-host sets using a metric like Moran’s I). We can then apply our best
-fitting link prediction models to the entire set of native hosts, and
-then test performance on non-native species to evaluate question 4. In
-addition to the main research questions outlined above, this project
-also allows us to predict possible unobserved links, as well as how
-incorporating of those links may influence overall network structure or
-stability.</p>
+frugivory links? ## 2. How do link prediction methods using trait-based,
+phylogenetic, or latent graph information compare? Do they overlap in
+the kinds of links they tend to get right, or can we combine them to be
+more than the sum of their parts?</p>
+<div id="abstract" class="section level2">
+<h2>Abstract:</h2>
+<p>Due to the constraints of limited effort and sampling error, observed
+species interaction networks will always be an imperfect representation
+of the ``true’’ underlying community. Link prediction methods allow us
+to construct a potentially more complete representation of a given
+empirical network by guiding targeted sampling of predicted links, as
+well as offer insight into potential interactions that may occur as
+species’ ranges shift. Various data types can predict interactions;
+understanding how different kinds of information compare in their
+ability to predict links between different types of nodes is important.
+To this end, we compare random-forest regression models informed by
+combinations of phylogenetic structure, species traits, and latent
+network structure in their ability to predict interactions in a diverse
+network of fruiting plants and frugivorous birds in Brazil’s Atlantic
+forest. We found that for our dataset, latent structure was the most
+important determinant of model predictive performance. While
+incorporating trait or phylogenetic information alongside latent
+features had little effect on discriminatory power, they did
+meaningfully increase overall model accuracy. Our results highlight the
+potential importance of latent structural features for predicting
+mutualistic interactions, and encourage a clear conceptual link between
+prediction performance metrics and the overall goal of predicting
+cryptic links.</p>
 </div>
-<div id="model-construction" class="section level2">
-<h2>Model Construction:</h2>
-<p>In order to make different methods both comparable across models as
-well as combinable into complex models, we have to establish a common
-link prediction model structure for calculating suitabilities. So far,
-I’ve done a bit of messing around with spectral curve fitting methods
-that use latent graph information, but these seem hard to bake into a
-common structure (at least right now).</p>
-<div id="plug-play" class="section level3">
-<h3>Plug &amp; Play</h3>
-<p>I’ve also messed with reusing Dallas et al. 2017’s Plug &amp; Play
-method, which uses a bayesian justification for comparing the covariance
-structure of all real training nodes (where <span class="math inline">\(y_{ij}=1\)</span>), compared to all possible node
-combinations. This approach can easily accept both continuous and binary
-variables, and phylogenetic decomposition allows us to turn phylogenetic
-information into a series of continuous eigenvectors, albeit with a
-significant loss of information. Still, these allows for them to be
-easily incorporated into a plug &amp; play framework.</p>
-<p>While the plug and play method does allow a way to incorporate
-phylogenetic information into prediction models in comparable way, it
-still lives two problems. First, as I currently see it the model does
-not allow for ordinal data; even its method of allowing binary factorial
-data is by converting it to 0’s and 1’s when calculating the covariance
-structure. Maybe there is an easy workaround for this that I haven’t
-found yet; the problem itself occurs when we’re calculating covariacne
-matrices for the two point sets (Dallas 2017 does this using
-<code>stats::cov()</code>). Second, I’m not sure (yet) how you’d be able
-to incorporate latent methods. Maybe there’s some sort of graph
-decomposition approach similar to the phylogenetic eigen approach that
-would allow you to condense that informaiton into a continous variable,
-or maybe a variable you get out of spectral curve fitting methods that
-can then be fed into the plug and play mode? I’m not sure yet.</p>
+<div id="repository-structure" class="section level2">
+<h2>Repository Structure</h2>
+<p><code>{bash} ├── README.md.  ├── Full_Analysis.Rmd. Main analysis file; should recreate the entire analysis start to finish provide you install the appropriate packages (easiest way to do this is to set initial chunk eval=TRUE) ├── Data.nosync │   ├── Results. These files are all are created as outputs of my analyses. These are saved as intermediate .Rda or .csv values since the analysis can be somewhat computationally intensive │   ├── ├── ttsplitReplicateRF_withJ.Rda Nested list; results of 100 iterations of model training of all 7 model variaitions after test-train split. Top level is 1:100 replites, lower level is the 7 model structures. W │   ├── ├── fullReplicateRF_predicts.Rda Nested list; same approach as above, but saving the output randomforest objects. This is quite large, but necessary for calculating variable importance │   ├── ├── fullNetPredictSummary.csv Model predictions of all 7 models averaged over 100 iterations trained on and predicting all potential interactions.  │   ├── DataSources. Data products used to perform this analyses. Citations found below.  │   ├── Old Stuff. The ether. Ive worked on this project for a while, and am not great at using git branches for alternate ideas or directions. This is the idea graveyard.</code></p>
 </div>
-<div id="data-bell-et-al-2017-httpsdoi.org10.1002ecy.1818" class="section level3">
-<h3>Data: Bell et al 2017 (<a href="https://doi.org/10.1002/ecy.1818" class="uri">https://doi.org/10.1002/ecy.1818</a>)</h3>
-<p>As of right now, I’ve been just pulling trees of Tree-Of-Life, but
-I’ll try to get better trees soon. I’m hoping the vertebrate tree will
-be easy to find, and Cleber suggested the BIEN tree for the plants which
-seems like a really good resource.</p>
-</div>
-<div id="papers-methods-to-look-at" class="section level3">
-<h3>Papers Methods to look at:</h3>
-<p>Preferrential Attatchment: Spectral Curve fitting: <a href="https://towardsdatascience.com/link-prediction-in-bipartite-graph-ad766e47d75c" class="uri">https://towardsdatascience.com/link-prediction-in-bipartite-graph-ad766e47d75c</a>,
-which is largely built around Kunegis 2011 (<a href="https://github.com/kunegis/phd" class="uri">https://github.com/kunegis/phd</a>) Heirarchical: Clauset
-2008 (<a href="https://doi.org/10.1038/nature06830" class="uri">https://doi.org/10.1038/nature06830</a>) Phylogenetic:
-Elmasri 2020 (DOI: 10.1214/19-AOAS1296) Trait Based:</p>
-</div>
+<div id="data-citations" class="section level2">
+<h2>Data Citations:</h2>
 </div>
 
 

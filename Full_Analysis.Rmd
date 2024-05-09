@@ -9,6 +9,22 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r, eval=TRUE}
+install.packages("tidyverse")
+install.packages("magrittr")
+install.packages("igraph")
+install.packages("pROC")
+install.packages("BIEN")
+install.packages("np")
+install.packages("PVR")
+install.packages("ape")
+install.packages("phytools")
+#install.packages("tictoc")
+install.packages("corrplot")
+```
+
+
+
 ```{r}
 library(tidyverse)
 library(magrittr)
@@ -19,7 +35,7 @@ library(np)
 library(PVR)
 library(ape)
 library("phytools")
-library(tictoc)
+#library(tictoc)
 library(corrplot)
 ```
 
@@ -32,16 +48,16 @@ library(corrplot)
 
 ## 1. Data Handling
 ```{r}
-dat <- read.csv("Data.nosync/ATLANTIC_frugivory.csv")
+dat <- read.csv("Data.nosync/DataSources/ATLANTIC_frugivory.csv")
 dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
 dat %<>% unique(.)
 ```
 
 ```{r}
-load("Data.nosync/BIEN_subtree.Rda")
-Mammal_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugMam/output.nex")
-Bird_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugBird/output.nex")
+load("Data.nosync/DataSources/BIEN_subtree.Rda")
+Mammal_trees <- ape::read.nexus(file="Data.nosync/DataSources/VertLife_FrugMam/output.nex")
+Bird_trees <- ape::read.nexus(file="Data.nosync/DataSources/VertLife_FrugBird/output.nex")
 ```
 
 Make Traits Binary
