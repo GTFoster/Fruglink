@@ -3,22 +3,22 @@ title: "README"
 author: "Grant Foster"
 date: "9/10/2021"
 output: html_document
-bibliography: Data.nosync/DataSources/Fruglink.bib
+bibliography: Data.nosync/Fruglink.bib
 link-citations: true
 ---
 
 
-#Research Questions:
-## 1. How well are we able to predict missing frugivory links?
-## 2. How do link prediction methods using trait-based, phylogenetic, or latent graph information compare? Do they overlap in the kinds of links they tend to get right, or can we combine them to be more than the sum of their parts?
+# Research Questions:
+### 1. How well are we able to predict missing frugivory links?
+### 2. How do link prediction methods using trait-based, phylogenetic, or latent graph information compare? Do they overlap in the kinds of links they tend to get right, or can we combine them to be more than the sum of their parts?
 
 
-## Abstract:
+### Abstract:
 
 Due to the constraints of limited effort and sampling error, observed species interaction networks will always be an imperfect representation of the ``true'' underlying community. Link prediction methods allow us to construct a potentially more complete representation of a given empirical network by guiding targeted sampling of predicted links, as well as offer insight into potential interactions that may occur as species' ranges shift. Various data types can predict interactions; understanding how different kinds of information compare in their ability to predict links between different types of nodes is important. To this end, we compare random-forest regression models informed by combinations of phylogenetic structure, species traits, and latent network structure in their ability to predict interactions in a diverse network of fruiting plants and frugivorous birds in Brazil's Atlantic forest. We found that for our dataset, latent structure was the most important determinant of model predictive performance. While incorporating trait or phylogenetic information alongside latent features had little effect on discriminatory power, they did meaningfully increase overall model accuracy. Our results highlight the potential importance of latent structural features for predicting mutualistic interactions, and encourage a clear conceptual link between prediction performance metrics and the overall goal of predicting cryptic links.
 
 
-## Repository Structure
+### Repository Structure
 ```{bash}
 ├── README.md. 
 ├── Full_Analysis.Rmd. Main analysis file; should recreate the entire analysis start to finish provide you install the appropriate packages (easiest way to do this is to set initial chunk eval=TRUE)
@@ -33,7 +33,7 @@ Due to the constraints of limited effort and sampling error, observed species in
 ```
 
 
-## Data Citations:
+### Data Citations:
 @bello2017
 @jetz2012
 @maitner2018bien

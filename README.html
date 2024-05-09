@@ -384,13 +384,19 @@ display: none;
 </div>
 
 
-<p>#Research Questions: ## 1. How well are we able to predict missing
-frugivory links? ## 2. How do link prediction methods using trait-based,
-phylogenetic, or latent graph information compare? Do they overlap in
-the kinds of links they tend to get right, or can we combine them to be
-more than the sum of their parts?</p>
-<div id="abstract" class="section level2">
-<h2>Abstract:</h2>
+<div id="research-questions" class="section level1">
+<h1>Research Questions:</h1>
+<div id="how-well-are-we-able-to-predict-missing-frugivory-links" class="section level3">
+<h3>1. How well are we able to predict missing frugivory links?</h3>
+</div>
+<div id="how-do-link-prediction-methods-using-trait-based-phylogenetic-or-latent-graph-information-compare-do-they-overlap-in-the-kinds-of-links-they-tend-to-get-right-or-can-we-combine-them-to-be-more-than-the-sum-of-their-parts" class="section level3">
+<h3>2. How do link prediction methods using trait-based, phylogenetic,
+or latent graph information compare? Do they overlap in the kinds of
+links they tend to get right, or can we combine them to be more than the
+sum of their parts?</h3>
+</div>
+<div id="abstract" class="section level3">
+<h3>Abstract:</h3>
 <p>Due to the constraints of limited effort and sampling error, observed
 species interaction networks will always be an imperfect representation
 of the ``true’’ underlying community. Link prediction methods allow us
@@ -414,12 +420,12 @@ mutualistic interactions, and encourage a clear conceptual link between
 prediction performance metrics and the overall goal of predicting
 cryptic links.</p>
 </div>
-<div id="repository-structure" class="section level2">
-<h2>Repository Structure</h2>
+<div id="repository-structure" class="section level3">
+<h3>Repository Structure</h3>
 <p><code>{bash} ├── README.md.  ├── Full_Analysis.Rmd. Main analysis file; should recreate the entire analysis start to finish provide you install the appropriate packages (easiest way to do this is to set initial chunk eval=TRUE) ├── Data.nosync │   ├── Results. These files are all are created as outputs of my analyses. These are saved as intermediate .Rda or .csv values since the analysis can be somewhat computationally intensive │   ├── ├── ttsplitReplicateRF_withJ.Rda Nested list; results of 100 iterations of model training of all 7 model variaitions after test-train split. Top level is 1:100 replites, lower level is the 7 model structures. W │   ├── ├── fullReplicateRF_predicts.Rda Nested list; same approach as above, but saving the output randomforest objects. This is quite large, but necessary for calculating variable importance │   ├── ├── fullNetPredictSummary.csv Model predictions of all 7 models averaged over 100 iterations trained on and predicting all potential interactions.  │   ├── DataSources. Data products used to perform this analyses. Citations found below.  │   ├── Old Stuff. The ether. Ive worked on this project for a while, and am not great at using git branches for alternate ideas or directions. This is the idea graveyard.  ├── Figures Figures as seen in the manuscript</code></p>
 </div>
-<div id="data-citations" class="section level2">
-<h2>Data Citations:</h2>
+<div id="data-citations" class="section level3">
+<h3>Data Citations:</h3>
 <p><span class="citation">Bello et al. (<a href="#ref-bello2017">2017</a>)</span> <span class="citation">Jetz et
 al. (<a href="#ref-jetz2012">2012</a>)</span> <span class="citation">Maitner et al. (<a href="#ref-maitner2018bien">2018</a>)</span></p>
 <div id="refs" class="references csl-bib-body hanging-indent">
@@ -440,6 +446,7 @@ Sandra M Durán, Daniel Guaderrama, et al. 2018. <span>“The Bien r
 Package: A Tool to Access the Botanical Information and Ecology Network
 (BIEN) Database.”</span> <em>Methods in Ecology and Evolution</em> 9
 (2): 373–79. https://doi.org/<a href="https://doi.org/10.1111/2041-210X.12861">https://doi.org/10.1111/2041-210X.12861</a>.
+</div>
 </div>
 </div>
 </div>
