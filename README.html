@@ -252,6 +252,28 @@ if (window.hljs) {
 
 
 
+<style type="text/css">
+
+div.csl-bib-body { }
+div.csl-entry {
+clear: both;
+}
+.hanging div.csl-entry {
+margin-left:2em;
+text-indent:-2em;
+}
+div.csl-left-margin {
+min-width:2em;
+float:left;
+}
+div.csl-right-inline {
+margin-left:2em;
+padding-left:1em;
+}
+div.csl-indent {
+margin-left: 2em;
+}
+</style>
 
 
 
@@ -394,10 +416,32 @@ cryptic links.</p>
 </div>
 <div id="repository-structure" class="section level2">
 <h2>Repository Structure</h2>
-<p><code>{bash} ├── README.md.  ├── Full_Analysis.Rmd. Main analysis file; should recreate the entire analysis start to finish provide you install the appropriate packages (easiest way to do this is to set initial chunk eval=TRUE) ├── Data.nosync │   ├── Results. These files are all are created as outputs of my analyses. These are saved as intermediate .Rda or .csv values since the analysis can be somewhat computationally intensive │   ├── ├── ttsplitReplicateRF_withJ.Rda Nested list; results of 100 iterations of model training of all 7 model variaitions after test-train split. Top level is 1:100 replites, lower level is the 7 model structures. W │   ├── ├── fullReplicateRF_predicts.Rda Nested list; same approach as above, but saving the output randomforest objects. This is quite large, but necessary for calculating variable importance │   ├── ├── fullNetPredictSummary.csv Model predictions of all 7 models averaged over 100 iterations trained on and predicting all potential interactions.  │   ├── DataSources. Data products used to perform this analyses. Citations found below.  │   ├── Old Stuff. The ether. Ive worked on this project for a while, and am not great at using git branches for alternate ideas or directions. This is the idea graveyard.</code></p>
+<p><code>{bash} ├── README.md.  ├── Full_Analysis.Rmd. Main analysis file; should recreate the entire analysis start to finish provide you install the appropriate packages (easiest way to do this is to set initial chunk eval=TRUE) ├── Data.nosync │   ├── Results. These files are all are created as outputs of my analyses. These are saved as intermediate .Rda or .csv values since the analysis can be somewhat computationally intensive │   ├── ├── ttsplitReplicateRF_withJ.Rda Nested list; results of 100 iterations of model training of all 7 model variaitions after test-train split. Top level is 1:100 replites, lower level is the 7 model structures. W │   ├── ├── fullReplicateRF_predicts.Rda Nested list; same approach as above, but saving the output randomforest objects. This is quite large, but necessary for calculating variable importance │   ├── ├── fullNetPredictSummary.csv Model predictions of all 7 models averaged over 100 iterations trained on and predicting all potential interactions.  │   ├── DataSources. Data products used to perform this analyses. Citations found below.  │   ├── Old Stuff. The ether. Ive worked on this project for a while, and am not great at using git branches for alternate ideas or directions. This is the idea graveyard.  ├── Figures Figures as seen in the manuscript</code></p>
 </div>
 <div id="data-citations" class="section level2">
 <h2>Data Citations:</h2>
+<p><span class="citation">Bello et al. (<a href="#ref-bello2017">2017</a>)</span> <span class="citation">Jetz et
+al. (<a href="#ref-jetz2012">2012</a>)</span> <span class="citation">Maitner et al. (<a href="#ref-maitner2018bien">2018</a>)</span></p>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-bello2017" class="csl-entry">
+Bello, Carolina, Mauro Galetti, Denise Montan, Marco A Pizo, Tatiane C
+Mariguela, Laurence Culot, Felipe Bufalo, et al. 2017. <span>“Atlantic
+Frugivory: A Plant–Frugivore Interaction Data Set for the Atlantic
+Forest.”</span> <em>Ecology</em> 98 (6): 1729. https://doi.org/<a href="https://doi.org/10.1002/ecy.1818">https://doi.org/10.1002/ecy.1818</a>.
+</div>
+<div id="ref-jetz2012" class="csl-entry">
+Jetz, Walter, Gavin H Thomas, Jeffery B Joy, Klaas Hartmann, and Arne O
+Mooers. 2012. <span>“The Global Diversity of Birds in Space and
+Time.”</span> <em>Nature</em> 491 (7424): 444–48. https://doi.org/<a href="https://doi.org/10.1038/nature11631">https://doi.org/10.1038/nature11631</a>.
+</div>
+<div id="ref-maitner2018bien" class="csl-entry">
+Maitner, Brian S, Brad Boyle, Nathan Casler, Rick Condit, John Donoghue,
+Sandra M Durán, Daniel Guaderrama, et al. 2018. <span>“The Bien r
+Package: A Tool to Access the Botanical Information and Ecology Network
+(BIEN) Database.”</span> <em>Methods in Ecology and Evolution</em> 9
+(2): 373–79. https://doi.org/<a href="https://doi.org/10.1111/2041-210X.12861">https://doi.org/10.1111/2041-210X.12861</a>.
+</div>
+</div>
 </div>
 
 

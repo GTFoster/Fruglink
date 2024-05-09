@@ -3,6 +3,8 @@ title: "README"
 author: "Grant Foster"
 date: "9/10/2021"
 output: html_document
+bibliography: Data.nosync/DataSources/Fruglink.bib
+link-citations: true
 ---
 
 
@@ -27,8 +29,11 @@ Due to the constraints of limited effort and sampling error, observed species in
 │   ├── ├── fullNetPredictSummary.csv Model predictions of all 7 models averaged over 100 iterations trained on and predicting all potential interactions. 
 │   ├── DataSources. Data products used to perform this analyses. Citations found below. 
 │   ├── Old Stuff. The ether. Ive worked on this project for a while, and am not great at using git branches for alternate ideas or directions. This is the idea graveyard. 
+├── Figures Figures as seen in the manuscript
 ```
 
 
 ## Data Citations:
-
+@bello2017
+@jetz2012
+@maitner2018bien
