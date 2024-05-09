@@ -39,7 +39,7 @@ dat %<>% unique(.)
 ```
 
 ```{r}
-load("BIEN_subtree.Rda")
+load("Data.nosync/BIEN_subtree.Rda")
 Mammal_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugMam/output.nex")
 Bird_trees <- ape::read.nexus(file="Data.nosync/VertLife_FrugBird/output.nex")
 ```
@@ -57,11 +57,10 @@ dat %<>%
   ) #Make sure we have scores for all our binary variables
 
 dat %<>% dplyr::filter(., Fruit_color !="") #This Remove blank fruit color entries
-dat$Plant_origin[dat$Plant_origin !="native"] <- "nonnative" #condense all nonnative plants into one (can revisit later)
+dat$Plant_origin[dat$Plant_origin !="native"] <- "nonnative" #condense all nonnative plants into one
 
 #dat$real <- 1 # note that these are real interactions; important when we expand later
 
-dat_old <- dat
 #dat$Frugivory_score <- paste("FrugScore", dat$Frugivory_score, sep="") #Make value names unambiguous as column names
 #dat$Lipid_Score <- paste("LipScore", dat$Lipid_Score, sep="")
 
@@ -86,6 +85,7 @@ dat[, which(colnames(dat)=="liana"):ncol(dat)][is.na(dat[,which(colnames(dat)=="
 dat <- left_join(dat, dat_old) #add back in our factor columns just in case we want them later
 ```
 Add Decomposed Plant Phylogeny to dat
+Since we have only one phylogeny for plants, we do this once and assign the resultant eigenvectors as columns in our dataset
 ```{r}
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
@@ -119,6 +119,8 @@ dat_new <- left_join(dat_wP, frugSVD, by="Frugivore_Species")
 
 return(dat_new)
 }
+
+
 birds <- svData(birds)
 ```
 Add names of the variables 
@@ -318,7 +320,7 @@ for(i in 1:100){
                )
   split_output[[i]] <- temp
 }
-#save(split_output, file="Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
+#save(split_output, file="Data.nosync/Results/ttsplitReplicateRF_withJ.Rda")
 ```
 
 
@@ -353,14 +355,14 @@ for(i in 1:100){
                )
   full_output[[i]] <- temp
 }
-#save(full_output, file="Data.nosync/FullData/fullReplicateRF_predicts.Rda")
+#save(full_output, file="Data.nosync/Results/fullReplicateRF_predicts.Rda")
 ```
 
 
 Rfob Version
 ```{r, eval=FALSE}
 rf_output <- list()
-for(i in 1:2){
+for(i in 1:100){
   #Set up Phylogeny
   frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
   frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
@@ -390,13 +392,13 @@ for(i in 1:2){
   
 }
 
-#save(rf_output, file="Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
+#save(rf_output, file="Data.nosync/Results/fullReplicateRF_rfobs.Rda")
 ```
 
 Loading in the results of the above analyses
 ```{r}
-load("Data.nosync/FullData/fullReplicateRF_predicts.Rda")
-load("Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
+load("Data.nosync/Results/fullReplicateRF_predicts.Rda")
+load("Data.nosync/Results/fullReplicateRF_rfobs.Rda")
 load("Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
 ```
 
@@ -423,7 +425,7 @@ performanceSummary <- performance %>% dplyr::group_by(., model) %>% dplyr::summa
                                                                                 avg_auc=mean(auc), sd_auc=sd(auc),
                                                                                 avg_mrse=mean(mrse), sd_mrse=sd(mrse),
                                                                                 avg_H=mean(H), sd_H=sd(H))
-
+performanceSummary
 ```
 
 Calculate 
@@ -457,21 +459,20 @@ var.share <- function(rf.obj, members) {
 ```
 
 
-Starts: Replicate_RF.Rmd line 218 or so
 
 ```{r}
-#load("ReplicateRF.Rda")
+load("ReplicateRF.Rda")
 
 output <- rf_output
 
 temp <- NULL
 for(i in 1:2){
   # Phy
-temp <- rbind(temp, data.frame(giniDec=output[[i]]$Phy$importance, model="Phy", run=i, trait=c("FrugPhy1", "FrugPhy2", "FrugPhy3", "Plantphy1", "Plantphy2", "Plantphy3","Plantphy4")))
+temp <- rbind(temp, data.frame(giniDec=rf_output[[i]]$Phy$importance, model="Phy", run=i, trait=c("FrugPhy1", "FrugPhy2", "FrugPhy3", "Plantphy1", "Plantphy2", "Plantphy3","Plantphy4")))
 
 
  # Traits
-traitstemp <- group.importance(rf.obj=output[[i]]$Traits, groups=list(
+traitstemp <- group.importance(rf.obj=rf_output[[i]]$Traits, groups=list(
                 growthform=c("tree","liana", "palm", "scrub"), 
                fruitcolor=c("yellow", "red", "black", "brown", "green"),
                LipidScore=c("Lipid_Score"),
@@ -609,11 +610,9 @@ levels(varimporSummary$trait)[match("FrugScore",levels(varimporSummary$trait))] 
 
 
 Trio_Colors <- c("#ff2929", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
-
-
-
 ```
 
+This code creates figure 2 of the manuscript (inset key added seperately)
 ```{r}
 varimporSummary$model <- as.factor(varimporSummary$model)
 
@@ -626,7 +625,7 @@ colKey[grepl("Phylogeny", colKey)==TRUE] <- Trio_Colors[1]
 colKey[grepl("SVD", colKey)==TRUE] <- Trio_Colors[3]
 colKey[grepl("#", colKey)==FALSE] <- Trio_Colors[2]
 
-#pdf(file="VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
+#pdf(file="Figures/VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
 ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
   scale_fill_manual(values = alpha(c("Phy" = "#ff2929",
                                 "Traits" = "#E0E411",
@@ -653,311 +652,41 @@ ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position
 #  geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+
 #    theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none")+ylab("Gini Importance Score")
 ```
+Look at the correlation between model predicted link suitabilities. This data is used to generate figure 3 from the manuscript. 
 
 
 
-
-###################################################################################################################
-
-```{r}
-output <- NULL
-for(i in 1:2){
-  for(j in 1:7){
-    temp <- as.data.frame(rf_output[[i]][[j]]$importance)
-    temp %<>% rownames_to_column(., var="trait")
-    temp$model <- names(rf_output[[i]])[j]
-    temp$run <- rf_output[[i]]$run
-    output <- rbind(output, temp)
-  }
-}
-
-varimporSummary <- output %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
-```
-
-
-
-```{r}
-
-Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
-
-colKey <- vector(mode="character", length=nrow(varimporSummary))
-colKey[levels(varimporSummary$trait) %in% c(f_phylo, p_phylo)==TRUE] <- Trio_Colors[1]
-colKey[levels(varimporSummary$trait) %in% c(f_traits, p_traits)==TRUE] <- Trio_Colors[2]
-colKey[levels(varimporSummary$trait) %in% c(f_latent, p_latent)==TRUE] <- Trio_Colors[3]
-
-levels(varimporSummary$trait)[match("Psvd1",levels(varimporSummary$trait))] <- "Plant SVD: Axis 1"
-levels(varimporSummary$trait)[match("Psvd2",levels(varimporSummary$trait))] <- "Plant SVD: Axis 2"
-levels(varimporSummary$trait)[match("Psvd3",levels(varimporSummary$trait))] <- "Plant SVD: Axis 3"
-levels(varimporSummary$trait)[match("Fsvd1",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 1"
-levels(varimporSummary$trait)[match("Fsvd2",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 2"
-levels(varimporSummary$trait)[match("Fsvd3",levels(varimporSummary$trait))] <- "Frugivore SVD: Axis 3"
-
-levels(varimporSummary$trait)[match("c1PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 1"
-levels(varimporSummary$trait)[match("c2PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 2"
-levels(varimporSummary$trait)[match("c3PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 3"
-levels(varimporSummary$trait)[match("c4PlDecomp",levels(varimporSummary$trait))] <- "Plant Phylogeny: Axis 4"
-levels(varimporSummary$trait)[match("fc1",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 1"
-levels(varimporSummary$trait)[match("fc2",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 2"
-levels(varimporSummary$trait)[match("fc3",levels(varimporSummary$trait))] <- "Frugivore Phylogeny: Axis 3"
-
-levels(varimporSummary$trait)[match("Frug_Mean_Gape_Size",levels(varimporSummary$trait))] <- "Frugivore Gape Size"
-levels(varimporSummary$trait)[match("Frug_Body_Mass",levels(varimporSummary$trait))] <- "Frugivore Mass"
-levels(varimporSummary$trait)[match("fruit_diameter",levels(varimporSummary$trait))] <- "Fruit Diameter"
-levels(varimporSummary$trait)[match("fruit_length",levels(varimporSummary$trait))] <- "Fruit Length"
-levels(varimporSummary$trait)[match("red",levels(varimporSummary$trait))] <- "Red Fruit"
-levels(varimporSummary$trait)[match("black",levels(varimporSummary$trait))] <- "Black Fruit"
-levels(varimporSummary$trait)[match("green",levels(varimporSummary$trait))] <- "Green Fruit"
-levels(varimporSummary$trait)[match("yellow",levels(varimporSummary$trait))] <- "Yellow Fruit"
-levels(varimporSummary$trait)[match("brown",levels(varimporSummary$trait))] <- "Brown Fruit"
-levels(varimporSummary$trait)[match("tree",levels(varimporSummary$trait))] <- "Tree"
-levels(varimporSummary$trait)[match("palm",levels(varimporSummary$trait))] <- "Palm"
-levels(varimporSummary$trait)[match("liana",levels(varimporSummary$trait))] <- "Liana"
-levels(varimporSummary$trait)[match("scrub",levels(varimporSummary$trait))] <- "Scrub"
-
-levels(varimporSummary$trait)[match("LipScore1",levels(varimporSummary$trait))] <- "Low Lipid Content Fruit"
-levels(varimporSummary$trait)[match("LipScore2",levels(varimporSummary$trait))] <- "Mid Lipid Content Fruit"
-levels(varimporSummary$trait)[match("LipScore3",levels(varimporSummary$trait))] <- "High Lipid Content Fruit"
-
-levels(varimporSummary$trait)[match("FrugScore1",levels(varimporSummary$trait))] <- "Occasional Frugivore"
-levels(varimporSummary$trait)[match("FrugScore2",levels(varimporSummary$trait))] <- "Facultative Frugivore"
-levels(varimporSummary$trait)[match("FrugScore3",levels(varimporSummary$trait))] <- "Strict Frugivore"
-```
-
-
-
-```{r}
-varimporSummary$trait %<>% as.factor()
-
-varimporSummary$model <- as.factor(varimporSummary$model)
-
-trio <- varimporSummary %>% dplyr::filter(., model=="Trio")
-varimporSummary$trait <- factor(varimporSummary$trait, levels=trio[order(trio$avg),]$trait)
-
-Trio_Colors <- c("#E411E0", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
-
-colKey <- vector(mode="character", length=length(levels(varimporSummary$trait)))
-
-colKey[grepl("Phylogeny", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[1]
-colKey[grepl("SVD", levels(varimporSummary$trait))==TRUE] <- Trio_Colors[3]
-colKey[colKey==""] <- Trio_Colors[2]
-
-
-#pdf(file="ESA_Figs/VarimporDraft.pdf", width=11, height=11)
-ggplot(data=varimporSummary, aes(y=trait, x=avg, col=model))+geom_point(size=5,)+theme_classic()+
-scale_color_manual(values = alpha(c("Phy" = "#E411E0",
-                              "Traits" = "#E0E411",
-                              "Latent" = "#11E0E4",
-                              "PhyTraits" = "#E27B79",
-                              "TraitsLatent" = "#79E27B",
-                              "PhyLatent" = "#7B79E2",
-                              "Trio" = "#000000"
-                              ), 1.0))+
-geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.2, color="dark grey", position = position_dodge(width=0.9))+xlab("Gini Importance Score")+ylab("Predictor")+
-  theme(axis.text.y = element_text(colour = colKey, size = 15), legend.position = "none", axis.title = element_text(size=20), plot.background = element_rect(fill = "dark grey"))
-```
-
-```{r}
-temp <- NULL
-for(i in 1:100){
-temp <- rbind(temp, data.frame(AUC=output[[i]]$Phy[[1]], model="Phy", run=i))
-
-temp <- rbind(temp, data.frame(AUC=output[[i]]$Traits[[1]], model="Traits", run=i))
-
-temp <- rbind(temp, data.frame(AUC=output[[i]]$Latent[[1]], model="Latent", run=i))
-
-temp <- rbind(temp, data.frame(AUC=output[[i]]$PhyTraits[[1]], model="PhyTrai-pts", run=i))
-
-temp <- rbind(temp, data.frame(AUC=output[[i]]$TraitsLatent[[1]], model="TraitsLatent", run=i))
-
-temp <- rbind(temp, data.frame(AUC=output[[i]]$PhyLatent[[1]], model="PhyLatent", run=i))
-
-temp <- rbind(temp, data.frame(AUC=output[[i]]$Trio[[1]], model="Trio", run=i))
-}
-
-Performance <- temp
-PerformanceSummary <- Performance %>% dplyr::group_by(., model) %>% dplyr::summarise(avgAUC=(mean(AUC)), sd=sd((AUC)))
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###################################################################################################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-ret <- NULL
+```{r, eval=FALSE}
+#Extracting all predictions from all replicates takes a while-saved as an output object for conenience
+fullnetworkPredicts <- NULL
 for(i in 1:100){
   for(j in 1:7){
     temp <- full_output[[i]][[j]]
     temp$model <- names(full_output[[i]][j])
     temp$run <- i
-    ret <- rbind(ret, temp)
+    fullnetworkPredicts <- rbind(fullnetworkPredicts, temp)
   }
 }
 
-library(magrittr)
-library(dplyr)
-z <- ret %>% group_by(., model, Frugivore_Species, Plant_Species) %>% dplyr::summarise(., avg=mean(S), std=sd(S))
-fullPredictsSummary <- z
-#save(fullPredictsSummary, file="fullNetPredictSummary.Rda")
-#write.csv(fullPredictsSummary,"fullNetPredictSummary.csv", row.names = FALSE)
-#x <- read.csv("fullNetPredictSummary.csv")
+fullPredictsSummary <- fullnetworkPredicts %>% group_by(., model, Frugivore_Species, Plant_Species) %>% dplyr::summarise(., avg=mean(S), std=sd(S))
+#write.csv(fullPredictsSummary,"Data.nosync/Results/fullNetPredictSummary.csv", row.names = FALSE)
 ```
 
-Temporary
+Load in our prediction and look at "true" values based on our existing dataset
 ```{r}
-pred <- read.csv(file="fullNetPredictSummary.csv")
+pred <- read.csv("Data.nosync/Results/fullNetPredictSummary.csv")
 
 key <- dplyr::select(birds, Frugivore_Species, Plant_Species)
 key$real <- 1
 
 pred <- left_join(pred, key, by = c("Frugivore_Species", "Plant_Species"))
 pred$real[is.na(pred$real)==TRUE] <- 0
+
+pred$combo <- paste(pred$Frugivore_Species, pred$Plant_Species, sep="-") #Create column with unique plant-frugivore combinations
+
+pred <- pred %>% group_by(., model) %>% dplyr::mutate(., scaled_avg=avg/max(avg, na.rm = TRUE)) #Scale by the maximum value
 ```
 
-```{r}
-pred$combo <- paste(pred$Frugivore_Species, pred$Plant_Species, sep="-")
-
-pred <- pred %>% group_by(., model) %>% dplyr::mutate(., scaled_avg=avg/max(avg, na.rm = TRUE))
-
-#top <- pred %>% dplyr::filter(., model=="Trio" & real==0) %>% top_n(., 100, avg)
-
-top <- pred %>% dplyr::filter(., model=="Trio" & real==0) %>% slice_max(., n=300, order_by=scaled_avg)
-
-top$combo <- paste(top$Frugivore_Species, top$Plant_Species, sep="-")
-top2 <- pred %>% dplyr::filter(., combo %in% top$combo)
-```
-
-
-```{r}
-FrugDegree <- data.frame(table(birds$Frugivore_Species)) %>% dplyr::rename(., "Frugivore_Species"="Var1", "FrugDegree"="Freq")
-PlantDegree <- data.frame(table(birds$Plant_Species)) %>% dplyr::rename(., "Plant_Species"="Var1", "PlantDegree"="Freq")
-top2 <- left_join(top2, FrugDegree, by="Frugivore_Species")
-top2 <- left_join(top2, PlantDegree, by="Plant_Species")
-```
-
-
-```{r}
-library(raster)
-library(rasterVis)
-library(scales)
-library(RColorBrewer)
-
-long <- top2 %>% dplyr::select(., model, combo, scaled_avg) %>% pivot_wider(names_from = model, values_from = c(scaled_avg))
-long <- top2 %>% dplyr::select(., combo, Plant_Species, Frugivore_Species, FrugDegree, PlantDegree) %>% unique() %>% left_join(long, ., by = "combo")
-long <- long %>% dplyr::select(., -model) %>% unique()
-
-long$Frugivore_Species <- as.factor(long$Frugivore_Species)
-long$Plant_Species <- as.factor(long$Plant_Species)
-
-long$Frugivore_Species <- reorder(long$Frugivore_Species, long$FrugDegree)
-long$Plant_Species <- reorder(long$Plant_Species, long$PlantDegree)
-```
-
-
-```{r}
-
-comp_raster <- long
-comp_raster$x <- as.numeric(long$Frugivore_Species)
-comp_raster$y <- as.numeric(long$Plant_Species)
-
-comp_raster %<>% dplyr::select(., x, y, Phy, Traits, Latent, PhyTraits, TraitsLatent, PhyLatent, Trio)
-comp_raster <- raster::rasterFromXYZ(comp_raster)
-#plot(comp_raster$Trio)
-#plot(comp_raster)
-rasterVis::levelplot(comp_raster)
-comp_raster$Trio
-
-
-# use colorbrewer which loads with the rasterVis package to generate
-# a color ramp of yellow to green
-
-cols <- colorRampPalette(brewer.pal(11,"OrRd"))
-rasterVis::levelplot(comp_raster, col.regions=cols)
-rasterVis::levelplot(comp_raster)
-
-pal <- colorRampPalette(c("black", "white"))
-
-myTheme <- BTCTheme()
-myTheme$panel.background$col = '#f1ecd3'
-
-#pdf(file="Draft_Figs/SuitabilityMap.pdf", width=6, height=6)
-levelplot(comp_raster, col.regions=c("white", rev(pal(15))), par.settings = myTheme, layout=c(3, 2), scales=list(tck=c(0,0), draw=FALSE))
-dev.off()
-
-
-levelplot(comp_raster$Trio, col.regions=c("white", rev(pal(15))), par.settings = myTheme, scales=list(tck=c(0,0), draw=FALSE))
-
-
-#pdf(file="Draft_Figs/SuitabilityMap.pdf", width=6, height=6)
-levelplot(comp_raster$Trio, col.regions=c("white", rev(pal(15))), par.settings = myTheme, layout=c(3, 2), scales=list(tck=c(0,0), draw=FALSE))
-#dev.off()
-
-
-#pdf(file="Draft_Figs/SuitabilityMap_Trio.pdf", width=6, height=6)
-rasterVis::levelplot(comp_raster$Trio, col.regions=c("white", rev(viridis::inferno(15))), par.settings = myTheme, scales=list(tck=c(0,0), draw=FALSE), colorkey=FALSE)
-#dev.off()
-
-```
-
-
-
-
-
-```{r}
-length(unique(top$Frugivore_Species))
-length(unique(top$Plant_Species))
-table(top$Frugivore_Species)
-table(top$Plant_Species)
-
-unique(top$combo[order(top$avg)])
-
-top2$combo_fact <- factor(top2$combo, levels=unique(top$combo[order(top$avg)]), ordered=TRUE)
-
-#pdf(file="test.pdf", height=4, width=12)
-ggplot(data=top2, aes(x=combo_fact, y=scaled_avg, fill=model))+geom_col(position="dodge", stat="identity")
-```
-
-
-
-########################Also not actually fixed...
 ```{r}
 composite <-pred %>% dplyr::select(., model, combo, real, scaled_avg)%>% pivot_wider(., names_from="model", values_from=scaled_avg)
 ```
@@ -975,7 +704,10 @@ corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, order = "AOE", m
 
 corr.matrix_unreal <- composite %>% dplyr::filter(., real==1) %>% dplyr::select(., -1, -2) %>% cor(., method="pearson", use="complete.obs")
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, order = "AOE", main="Pearson: unobserved")
+```
 
+Some different visualizations of these corplots. 
+```{r, eval=FALSE}
 #pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
 
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
@@ -985,7 +717,7 @@ corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Spearman: 
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, main="Pearson: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
 
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
-corrplot::corrplot.mixed(spear.matrix_full, lower="number", upper="ellipse", diag=T, main="Spearman: All Links", mar=c(0,0,2,0))
+corrplot::corrplot.mixed(spear.matrix_full, main="Spearman: All Links", mar=c(0,0,2,0))
 corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, main="Pearson: All Links", mar=c(0,0,2,0), method="ellipse")
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Spearman: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, main="Pearson: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
@@ -1026,68 +758,45 @@ corrplot::corrplot.mixed(corr.matrix_unreal,
 	diag = "u"
 )
 
+```
 
-pdf(file="ESA_Figs/SpearmanCorplot_nolab.pdf", width=9, height=5)
+Below is the plot as it appears in the figure
+```{r}
+#pdf(file="Figures/SpearmanCorplot_nolab.pdf", width=9, height=5)
 par(mfrow = c(1, 2), oma=c(0,0,2,0))
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="A)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="B)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
-dev.off()
+#dev.off()
 ```
 
 
-Confusion Matrix
+True/False positive rate (Based on Youden's J threshold)
 
-```{r}
-pred$Eighty5 <- NA
-pred$Eighty5[pred$scaled_avg >0.85] <- 1
-pred$Eighty5[is.na(pred$Eighty5)==TRUE] <- 0
-
-Eighty5_Sum <- pred %>% dplyr::group_by(., model) %>% dplyr::summarise(., trueP=sum(real == Eighty5 & real ==1), falseP=sum(real < Eighty5), trueN=sum(real == Eighty5 & real == 0), falseN=sum(real!=Eighty5 & real==1))
-
-
-pred$Fifty <- NA
-pred$Fifty[pred$scaled_avg >0.5] <- 1
-pred$Fifty[is.na(pred$Fifty)==TRUE] <- 0
-
-Fifty_Sum <- pred %>% dplyr::group_by(., model) %>% dplyr::summarise(., trueP=sum(real == Fifty & real ==1), falseP=sum(real < Fifty), trueN=sum(real == Fifty & real == 0), falseN=sum(real!=Fifty & real==1))
-
-Fifty_Sum$trueP <- as.numeric(Fifty_Sum$trueP)
-Fifty_Sum$falseP <- as.numeric(Fifty_Sum$falseP)
-Fifty_Sum$trueN <- as.numeric(Fifty_Sum$trueN)
-Fifty_Sum$falseN <- as.numeric(Fifty_Sum$falseN)
-
-for(i in 1:5){
-  Fifty_Sum[i,2:5] <- Fifty_Sum[i,2:5]/sum(Fifty_Sum[i,2:5])
-}
-```
 Matrix 2: Even more confused
 ```{r}
-load("ttsplitReplicateRF_withJ.Rda")
+#load("ttsplitReplicateRF_withJ.Rda") #This should already be loaded from above, but included in case you aren't running from start to finish.
 
-test <- matrix(data=NA, nrow=100, ncol=7)
-colnames(test) <- c("Phy", "Traits", "Latent","PhyTraits","TraitsLatent", "PhyLatent", "Trio")
+Jout <- matrix(data=NA, nrow=100, ncol=7)
+colnames(Jout) <- c("Phy", "Traits", "Latent","PhyTraits","TraitsLatent", "PhyLatent", "Trio")
 
 for(row in 1:100){
   for(column in 1:7){
-    test[row,column] <- split_output[[row]][[column]]$maxJ
+    Jout[row,column] <- split_output[[row]][[column]]$maxJ
   }
 }
 
-test_sum <- colMeans(test)
-names(test_sum) <- colnames(test)
-```
+J_sum <- colMeans(Jout)
+names(J_sum) <- colnames(Jout)
 
-
-```{r}
 pred$optimal <- NA
 
-pred$optimal[pred$model=="Phy" & pred$avg > test_sum["Phy"]] <- 1
-pred$optimal[pred$model=="Latent" & pred$avg > test_sum["Latent"]] <- 1
-pred$optimal[pred$model=="Traits" & pred$avg > test_sum["Traits"]] <- 1
-pred$optimal[pred$model=="PhyLatent" & pred$avg > test_sum["PhyLatent"]] <- 1
-pred$optimal[pred$model=="PhyTraits" & pred$avg > test_sum["PhyTraits"]] <- 1
-pred$optimal[pred$model=="TraitsLatent" & pred$avg > test_sum["TraitsLatent"]] <- 1
-pred$optimal[pred$model=="Trio" & pred$avg > test_sum["Trio"]] <- 1
+pred$optimal[pred$model=="Phy" & pred$avg > J_sum["Phy"]] <- 1
+pred$optimal[pred$model=="Latent" & pred$avg > J_sum["Latent"]] <- 1
+pred$optimal[pred$model=="Traits" & pred$avg > J_sum["Traits"]] <- 1
+pred$optimal[pred$model=="PhyLatent" & pred$avg > J_sum["PhyLatent"]] <- 1
+pred$optimal[pred$model=="PhyTraits" & pred$avg > J_sum["PhyTraits"]] <- 1
+pred$optimal[pred$model=="TraitsLatent" & pred$avg > J_sum["TraitsLatent"]] <- 1
+pred$optimal[pred$model=="Trio" & pred$avg > J_sum["Trio"]] <- 1
 pred$optimal[is.na(pred$optimal)==TRUE] <- 0
 
 
@@ -1113,21 +822,5 @@ for(a in 1:7){
 }
 
 compTable <- as.data.frame(compTable)
+compTable
 ```
-
-
-```{r}
-colnames(compTable) <- c("Model", "True Positives", "False Positives", "True Negatives", "False Negatives")
-confusion <- compTable %>%
-  kbl() %>%
-  kable_paper(full_width = F) %>%
-  column_spec(2, color = spec_color(OptimalThresh_Prop$trueP, end=0.8)) %>%
-  column_spec(4, color = spec_color(OptimalThresh_Prop$trueN, end=0.8)) %>%
-  column_spec(3, color = spec_color(OptimalThresh_Prop$falseP, direction = -1, end=0.8))%>%
-  column_spec(5, color = spec_color(OptimalThresh_Prop$falseN, direction = -1, end=0.8))%>%
-  kable_classic("striped", full_width = F)
-
-save_kable(confusion, file="Draft_Figs/Confusion_Matrix.pdf")
-```
-
-
