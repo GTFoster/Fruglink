@@ -1,13 +1,3 @@
----
-title: "README"
-author: "Grant Foster"
-date: "9/10/2021"
-output: html_document
-bibliography: Data.nosync/Fruglink.bib
-link-citations: true
----
-
-
 # Research Questions:
 ### 1. How well are we able to predict missing frugivory links?
 ### 2. How do link prediction methods using trait-based, phylogenetic, or latent graph information compare? Do they overlap in the kinds of links they tend to get right, or can we combine them to be more than the sum of their parts?
