@@ -89,7 +89,7 @@ Add Decomposed Plant Phylogeny to dat
 ```{r}
 plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 42.6% of variation :(
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 37.5% of variation
 
 plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
 colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
@@ -99,6 +99,7 @@ plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plan
 dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
 birds <- dplyr::filter(dat, Frug_Class=="Aves")
 ```
+
 SVD Function & Add to Birds
 ```{r}
 svData <- function(dat){
@@ -161,6 +162,20 @@ getAccurate_in <- function(test, threshold=0.5){
 
 RF methods-Test-Train Split
 ```{r}
+#'Our main analysis function. 
+#'
+#'@dat Your input dataframe. Each row should be a frugivore-plant interaction, with columns of continous traits of those plants and frugivores. 
+#'@FrugTraits Vectors of characters. Each entry should correspond to the name of a column in the "dat" argument with associated data
+#'@PlantTraits Vectors of characters. Each entry should correspond to the name of a column in the "dat" argument with associated data
+#'@class_balancing Boolean. To help alleviate the class-imbalances inherent to ecological data, gives the option to filter the training dataset. If TRUE, non-interactions are filtered so that the training data has a ratio of at least 1:@balance_ratio.
+#'@balance_ratio Numeric Value "n".If class_balancing==TRUE, filters non-observed observations so that the training data set has a ratio of at least 1:n. Defaults to 1:3 (25%). 
+#'@returnTestTrain Boolean. If TRUE, includes the test and train dataframes in the output list object. If FALSE, these are discarded
+#'@output_type Character. Options are "performance", which returns performance metrics of resulting model (accuracy, auc, mrse, Hmeasure, maximum thresh of Youden's J), and "rfobject", which returns the entire rfobject. This can be large.
+#'
+#'
+
+
+
 woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, returnTestTrain=FALSE, output_type="performance"){
   #Set up our data into a fully expanded edgelist
   require(tidyr)
@@ -220,8 +235,11 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, bala
     output <- getAccurate_in(test)
   return(output)
   }
-  if(output_type!="performance"){
+  if(output_type=="rfobject"){
   return(model)
+  }
+  if((output_type %in% c("rfobject", "performance"))==FALSE){
+    stop("Invalid output_type: choices are performance or rfobject")
   }
 }
 ```
@@ -269,7 +287,7 @@ woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FAL
 
 ## 3. Run Randomforest on Test-train split w/Replicates
 Run 100 times!
-```{r}
+```{r, eval=FALSE}
 split_output <- list()
 for(i in 1:100){
   #Set up Phylogeny
@@ -300,11 +318,13 @@ for(i in 1:100){
                )
   split_output[[i]] <- temp
 }
-save(split_output, file="Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
+#save(split_output, file="Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
 ```
+
+
 ## 4. Run Randomforest on Full Network w/Replicates
 Run 100 times!
-```{r}
+```{r, eval=FALSE}
 full_output <- list()
 for(i in 1:100){
   #Set up Phylogeny
@@ -333,12 +353,12 @@ for(i in 1:100){
                )
   full_output[[i]] <- temp
 }
-save(full_output, file="Data.nosync/FullData/fullReplicateRF_predicts.Rda")
+#save(full_output, file="Data.nosync/FullData/fullReplicateRF_predicts.Rda")
 ```
 
 
 Rfob Version
-```{r}
+```{r, eval=FALSE}
 rf_output <- list()
 for(i in 1:2){
   #Set up Phylogeny
@@ -373,18 +393,17 @@ for(i in 1:2){
 #save(rf_output, file="Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
 ```
 
+Loading in the results of the above analyses
 ```{r}
 load("Data.nosync/FullData/fullReplicateRF_predicts.Rda")
 load("Data.nosync/FullData/fullReplicateRF_rfobs_2.Rda")
 load("Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
 ```
 
-```{r}
-
-```
 
 Performance Metrics: After Test-Trait Split
 
+Create a summary data frame summarizing the performance of the split outputs. These values are presented in figure one of the manuscript.
 ```{r}
 performance <- NULL
 for(i in 1:100){
@@ -406,8 +425,9 @@ performanceSummary <- performance %>% dplyr::group_by(., model) %>% dplyr::summa
                                                                                 avg_H=mean(H), sd_H=sd(H))
 
 ```
-Variable Importance for Composite Model
 
+Calculate 
+Variable Importance for Composite Model
 ```{r}
 #' Summarize Gini impurity score across one-hot encoded variables
 #' Does this by created a weighted mean impurity score, where weight is based on frequency of the variable
@@ -606,7 +626,7 @@ colKey[grepl("Phylogeny", colKey)==TRUE] <- Trio_Colors[1]
 colKey[grepl("SVD", colKey)==TRUE] <- Trio_Colors[3]
 colKey[grepl("#", colKey)==FALSE] <- Trio_Colors[2]
 
-pdf(file="VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
+#pdf(file="VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
 ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
   scale_fill_manual(values = alpha(c("Phy" = "#ff2929",
                                 "Traits" = "#E0E411",
@@ -1007,11 +1027,11 @@ corrplot::corrplot.mixed(corr.matrix_unreal,
 )
 
 
-#pdf(file="ESA_Figs/SpearmanCorplot.pdf", width=8.5, height=6)
+pdf(file="ESA_Figs/SpearmanCorplot_nolab.pdf", width=9, height=5)
 par(mfrow = c(1, 2), oma=c(0,0,2,0))
-corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="All Potential Links", mar=c(0,0,2,0), method="ellipse")
-corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Unobserved Links", mar=c(0,0,2,0), method="ellipse")
-#dev.off()
+corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="A)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
+corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="B)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
+dev.off()
 ```
 
 
