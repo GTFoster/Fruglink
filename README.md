@@ -34,6 +34,8 @@ Due to the constraints of limited effort and sampling error, observed species in
 
 
 ### Data Citations:
-@bello2017
-@jetz2012
-@maitner2018bien
+Bello, Carolina, Mauro Galetti, Denise Montan, Marco A Pizo, Tatiane C Mariguela, Laurence Culot, Felipe Bufalo, et al. 2017. “Atlantic Frugivory: A Plant–Frugivore Interaction Data Set for the Atlantic Forest.” Ecology 98 (6): 1729. https://doi.org/https://doi.org/10.1002/ecy.1818.
+
+Jetz, Walter, Gavin H Thomas, Jeffery B Joy, Klaas Hartmann, and Arne O Mooers. 2012. “The Global Diversity of Birds in Space and Time.” Nature 491 (7424): 444–48. https://doi.org/https://doi.org/10.1038/nature11631.
+
+Maitner, Brian S, Brad Boyle, Nathan Casler, Rick Condit, John Donoghue, Sandra M Durán, Daniel Guaderrama, et al. 2018. “The Bien r Package: A Tool to Access the Botanical Information and Ecology Network (BIEN) Database.” Methods in Ecology and Evolution 9 (2): 373–79. https://doi.org/https://doi.org/10.1111/2041-210X.12861.
