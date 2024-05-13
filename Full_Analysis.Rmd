@@ -405,10 +405,9 @@ for(i in 1:100){
                )
   rf_output[[i]] <- temp
   print(paste(i, "of 100", sep=" "))
-  
 }
 
-#save(rf_output, file="Data.nosync/Results/fullReplicateRF_rfobs.Rda")
+save(rf_output, file="Data.nosync/Results/fullReplicateRF_rfobs.Rda")
 ```
 
 Loading in the results of the above analyses
@@ -477,12 +476,8 @@ var.share <- function(rf.obj, members) {
 
 
 ```{r}
-load("ReplicateRF.Rda")
-
-output <- rf_output
-
 temp <- NULL
-for(i in 1:2){
+for(i in 1:100){
   # Phy
 temp <- rbind(temp, data.frame(giniDec=rf_output[[i]]$Phy$importance, model="Phy", run=i, trait=c("FrugPhy1", "FrugPhy2", "FrugPhy3", "Plantphy1", "Plantphy2", "Plantphy3","Plantphy4")))
 
@@ -582,7 +577,7 @@ triotemp <- group.importance(rf.obj=output[[i]]$Trio, groups=list(
               Plantphy3="c3PlDecomp",
               Plantphy4="c4PlDecomp"))
 temp <- rbind(temp, data.frame(giniDec=triotemp, model="Trio", run=i, trait=rownames(triotemp)))
-rm(traitslatenttemp)
+rm(triotemp)
 }
 
 varimport <- temp
