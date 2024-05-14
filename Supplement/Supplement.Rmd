@@ -1,0 +1,102 @@
+---
+title: "Supplemental Analysis"
+author: "ANONYMIZED"
+output:
+  pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+```{r, quiet=TRUE, message=FALSE, echo=FALSE}
+library(tidyverse)
+library(igraph)
+library(BIEN)
+library(PVR)
+library(ape)
+library("phytools")
+library(picante)
+library(magrittr)
+```
+
+```{r, echo=FALSE}
+#Initial data processing steps
+dat <- read.csv("../Data.nosync/DataSources/ATLANTIC_frugivory.csv")
+dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
+dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
+dat %<>% unique(.)
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+```
+
+## Phylogenetic Specialism
+
+Here we quantify the phylogenetic specialism of frugivores. To do this, we'll employ the `ses.mpd()` from the `picante` library. This function allows us to use a null model of our choice to find the standard effect size of pairwise distance in communities. In our case, we're interested in pairwise mean phylogenetic distance, and our "communities" are the total sets of plants that each frugivore interact with. We employ an independent swap null model, where the tip labels of the underlying phylogenetic tree are effectively swapped a given number of times (Gotelli, 2000). 
+
+```{r, tidy=TRUE}
+set.seed(1)
+load("../Data.nosync/DataSources/BIEN_subtree.Rda")
+#Create cophenetic distance matrix
+dmatrix <- stats::cophenetic(BIEN_subtree) 
+#Standardize by the maximum value
+dmatrix <- dmatrix/max(dmatrix) 
+
+#String manipulation so tree tip names match
+birds$plant_Tips <- gsub(pattern=" ", replace="_", x=birds$Plant_Species) 
+#Only include plant species for which phylogenetic info is available
+birds_phylo<- dplyr::filter(birds, plant_Tips %in% BIEN_subtree$tip.label) 
+
+comm <- as.data.frame.matrix(table(birds_phylo$Frugivore_Species, birds_phylo$plant_Tips))#Binary, unweighted intraction matrix.
+#The main function. Randomly swap tip labels 999 times and see whether the observed sets of plant interactors for each species is more phylogenetically clustered than this assumed distribution
+test_mpd <- picante::ses.mpd(comm, dmatrix, null.model = "independentswap", abundance.weighted=FALSE, runs = 999, iterations = 1000) 
+ #Remove singleton species (can't compute a phylogenetic distance)
+phylospec <- dplyr::filter(test_mpd, ntaxa > 1)
+ #Remove singleton species (can't compute a phylogenetic distance)
+sig <- nrow(dplyr::filter(phylospec, mpd.obs.p<0.05)) 
+print(sig)
+```
+
+We see that the number of frugivores whose plant partners are more significantly related than expected compared to a random draw is equal to `r sig` (The exact value may change slightly when the seed is changed due to the stochastic nature of the model, but the results should be qualitatively similar each time)
+
+## Calculating the number of unique species in the dataset
+```{r, echo=FALSE}
+#Number of unique species and interactions
+
+#For the full dataset
+#length(unique(dat$Frugivore_Species))
+#length(unique(dat$Plant_Species))
+
+```
+
+In our dataset, we observe interactions between `r length(unique(birds$Frugivore_Species))` unique frugivore species and `r length(unique(birds$Plant_Species))` unique plant species.
+
+## Degree Distributions of Mutualistic Partners
+
+```{r, echo=FALSE, fig.width=5, fig.height=4}
+#paste(median(table(dat$Frugivore_Species)),"=median frugivore degree", sep=" ")
+hist(table(birds$Frugivore_Species), xlab="Degree", ylab="Observed Frequency", main=NA)
+#frugdeg <- dplyr::group_by(birds, Frugivore_Species) %>% dplyr::summarise(., degree=length(unique(Plant_Species)))
+#frugdeg$Frugivore_Species[frugdeg$degree==max(frugdeg$degree)]
+#range(frugdeg$degree)
+#table(table(birds$Frugivore_Species)==1) #Singleton species
+```
+
+
+**Figure S1:** Observed degree distribution of avian frugivore species included in our analyses. X-axis represents node degree, or number of unique partners. Degree for frugivores ranged from 1 (53 species) to 120 unique plant interactions recorded for \emph{Turdus rufiventris}; median frugivore degree was `r median(table(dat$Frugivore_Species))`.
+
+```{r, echo=FALSE, fig.width=5, fig.height=4}
+#paste(median(table(dat$Plant_Species)),"= median plant degree", sep=" ")
+hist(table(birds$Plant_Species), xlab="Degree", ylab="Observed Frequency", main=NA)
+#plantdeg <- dplyr::group_by(birds, Plant_Species) %>% dplyr::summarise(., degree=length(unique(Frugivore_Species)))
+#plantdeg$Plant_Species[plantdeg$degree==max(plantdeg$degree)]
+#range(plantdeg$degree)
+#table(table(birds$Plant_Species)==1) #Singleton species
+```
+
+
+**Figure S2:** Observed degree distribution of avian frugivore species included in our analyses. X-axis represents node degree, or number of unique partners. Degree on average tended to be lower for plants than frugivores; plant node degree ranged from 1 (128 species) to 80 unique frugivorous interactions recorded for \emph{Myrsine coriacea}; median plant degree was `r median(table(dat$Frugivore_Species))`.
+
+
+## References
+
+Gotelli N.J. (2000) Null model analysis of species co-occurrence patterns. Ecology, 81, 2606-2621
