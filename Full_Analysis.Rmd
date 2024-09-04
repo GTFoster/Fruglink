@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, eval=TRUE}
+```{r, eval=FALSE}
 install.packages("tidyverse")
 install.packages("magrittr")
 install.packages("igraph")
@@ -37,6 +37,7 @@ library(ape)
 library("phytools")
 #library(tictoc)
 library(corrplot)
+library(phytools)
 ```
 
 # Table of Contents
@@ -52,12 +53,24 @@ dat <- read.csv("Data.nosync/DataSources/ATLANTIC_frugivory.csv")
 dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
 dat %<>% unique(.)
+
+#Remove trailing or leading white space from species names in case
+dat$Frugivore_Species <- trimws(dat$Frugivore_Species, which=c("both"))
+dat$Plant_Species <- trimws(dat$Plant_Species, which=c("both"))
+
+#Resolving some taxonomic changes to align with Jetz tree later
+dat$Frugivore_Species[dat$Frugivore_Species=="Aburria jacutinga"] <- "Pipile jacutinga"
+dat$Frug_Genus[dat$Frugivore_Species=="Pipile jacutinga"] <- "Pipile"
+dat$Frugivore_Species[dat$Frugivore_Species=="Myiothlypis flaveola"] <- "Basileuterus flaveolus"
+dat$Frug_Genus[dat$Frugivore_Species=="Basileuterus flaveolus"] <- "Basileuterus"
 ```
 
 ```{r}
 load("Data.nosync/DataSources/BIEN_subtree.Rda")
 Mammal_trees <- ape::read.nexus(file="Data.nosync/DataSources/VertLife_FrugMam/output.nex")
-Bird_trees <- ape::read.nexus(file="Data.nosync/DataSources/VertLife_FrugBird/output.nex")
+#Bird_trees <- ape::read.nexus(file="Data.nosync/DataSources/VertLife_FrugBird/output.nex")
+
+Bird_trees <- ape::read.nexus("Data.nosync/DataSources/VertLife_FrugBird/query2/output_larger.nex")
 ```
 
 Make Traits Binary
@@ -100,21 +113,65 @@ dat[, which(colnames(dat)=="liana"):ncol(dat)][is.na(dat[,which(colnames(dat)=="
 
 dat <- left_join(dat, dat_old) #add back in our factor columns just in case we want them later
 ```
+
+
+
 Add Decomposed Plant Phylogeny to dat
-Since we have only one phylogeny for plants, we do this once and assign the resultant eigenvectors as columns in our dataset
+Since we have only one phylogeny for plants, we do this once and assign the resultant eigenvectors as columns in our dataset. This isn't currently run, since we've amended the code to first include more species as polytomies when congenerics are available. 
 ```{r}
-plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
+#plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 37.5% of variation
+#sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 37.5% of variation
 
-plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
+#plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
+#colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
+
+#plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
+
+#dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
+#birds <- dplyr::filter(dat, Frug_Class=="Aves")
+```
+
+
+
+Bien Phylogeny contains 646 out of 787 total plants. By including species with congenerics into our tree as randomly assigned polytomies within the genus, we can add an additional 46 species. 
+```{r}
+nas <- dplyr::filter(birds, is.na(c1PlDecomp)==TRUE) %>% dplyr::select(., Plant_Species) %>% unique() #Plant species that don't occur in our tree
+
+genera <- sub("_[^ ]+$", "", BIEN_subtree$tip.label) %>% unique() #Genera list present in Bien
+nas$genus <- sub(" [^ ]+$", "", nas$Plant_Species) #Extract only genera
+nas <- nas[nas$genus %in% genera,] #Only the species that have genera already in the tree
+
+ult_BIEN <- force.ultrametric(BIEN_subtree) #Our tree should already be ultrametric, but just in case
+
+polytree <- ult_BIEN #new tree object
+for(i in 1:nrow(nas)){ #add in our missing genera as polytomies
+  polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Plant_Species[i], where="root") #Create polytomy at the genera root. 
+}
+
+#length(polytree$tip.label) - length(BIEN_subtree$tip.label) #Number of net tips
+```
+
+Here we recompute the phylogenetic decomposition, including the congeneric polytomies. 
+```{r}
+plant_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 37.2% of variation
+
+plant_PhyEig <-data.frame(polytree$tip.label, plant_litter@Eigen$vectors[,1:5])
 colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
 
 plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
+colnames(plant_PhyEig) <- gsub("Decomp", "PolyDecomp", colnames(plant_PhyEig))
 
 dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
 birds <- dplyr::filter(dat, Frug_Class=="Aves")
+
+#cor.test(birds$c1PlDecomp, birds$c1PlPolyDecomp) #Super tightly linked. 
+#cor.test(birds$c5PlDecomp, birds$c5PlPolyDecomp)
 ```
+
+
 
 SVD Function & Add to Birds
 ```{r}
@@ -139,6 +196,7 @@ return(dat_new)
 
 birds <- svData(birds)
 ```
+
 Add names of the variables 
 ```{r}
 p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
@@ -191,7 +249,6 @@ RF methods-Test-Train Split
 #'@output_type Character. Options are "performance", which returns performance metrics of resulting model (accuracy, auc, mrse, Hmeasure, maximum thresh of Youden's J), and "rfobject", which returns the entire rfobject. This can be large.
 #'
 #'
-
 
 
 woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, returnTestTrain=FALSE, output_type="performance"){
@@ -303,20 +360,44 @@ woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FAL
 ```
 
 
+```{r}
+syns <- c("Aburria jacutinga", "Baillonius bailloni", "Myiothlypis flaveola", "Setophaga pitiayumi")
+tol <- taxize::tol_resolve(syns)
+tol$unique_name %in% gsub("_", " ", Bird_trees[[1]]$tip.label)
+
+birdlist<-c(unique(birds$Frugivore_Species), tol$unique_name, "Aburria aburri", "Setophaga ruticilla") #Including two species with only congenerics in ds missing from Jetz tree.
+
+#library(clipr)
+#clipr::write_clip(birdlist)
+```
+
+
+
 ## 3. Run Randomforest on Test-train split w/Replicates
 Run 100 times!
 ```{r, eval=FALSE}
 split_output <- list()
 for(i in 1:100){
+    nas <- dplyr::filter(birds_temp, is.na(fc1)==TRUE) %>% dplyr::select(., Frugivore_Species) %>% unique() #Bird taxa that don't occur in our tree
+    genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
+    nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+    nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+    nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+    ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
+    polytree <- ult_birdTree #new tree object
+    for(i in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[i], where="root") #Create polytomy at the genera root. 
+    }
+    #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+  
   #Set up Phylogeny
-  frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
-  frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+  frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+  frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
   colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
   frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
   birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
   
   rebalancedRF_Phy <- woodedWalk(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE)
-  
   rebalancedRF_Traits <- woodedWalk(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE, )
   rebalancedRF_Latent <- woodedWalk(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE)
   rebalancedRF_PhyTraits <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE)
@@ -336,7 +417,7 @@ for(i in 1:100){
                )
   split_output[[i]] <- temp
 }
-#save(split_output, file="Data.nosync/Results/ttsplitReplicateRF_withJ.Rda")
+save(split_output, file="Data.nosync/Results/ttsplitReplicateRF_withJ.Rda")
 ```
 
 
@@ -371,7 +452,7 @@ for(i in 1:100){
                )
   full_output[[i]] <- temp
 }
-#save(full_output, file="Data.nosync/Results/fullReplicateRF_predicts.Rda")
+save(full_output, file="Data.nosync/Results/fullReplicateRF_predicts.Rda")
 ```
 
 
@@ -588,7 +669,7 @@ varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>% dplyr::sum
 
 varimporSummary$trait %<>% as.factor()
 
-#save(varimporSummary, file="Data.nosyncVarImportSummary.Rda")
+save(varimporSummary, file="Data.nosync/VarImportSummary.Rda")
 ```
 
 
@@ -636,7 +717,7 @@ colKey[grepl("Phylogeny", colKey)==TRUE] <- Trio_Colors[1]
 colKey[grepl("SVD", colKey)==TRUE] <- Trio_Colors[3]
 colKey[grepl("#", colKey)==FALSE] <- Trio_Colors[2]
 
-#pdf(file="Figures/VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
+pdf(file="Figures/VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
 ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
   scale_fill_manual(values = alpha(c("Phy" = "#ff2929",
                                 "Traits" = "#E0E411",
@@ -719,7 +800,7 @@ corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, order = "AOE", ma
 
 Some different visualizations of these corplots. 
 ```{r, eval=FALSE}
-#pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
+pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
 
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="Spearman: All Links", mar=c(0,0,2,0), method="ellipse")
@@ -733,10 +814,10 @@ corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, main="Pearson: All 
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="Spearman: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
 corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, main="Pearson: Unobserved Links", mar=c(0,0,2,0), method="ellipse")
 
-#dev.off()
+dev.off()
 
 
-#pdf(file="ESA_Figs/MixedCorrPlots.pdf", width=8.5, height=9.2)
+pdf(file="ESA_Figs/MixedCorrPlots.pdf", width=8.5, height=9.2)
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
 corrplot::corrplot.mixed(spear.matrix_full, 
 	lower='number', upper='ellipse',
@@ -773,11 +854,11 @@ corrplot::corrplot.mixed(corr.matrix_unreal,
 
 Below is the plot as it appears in the figure
 ```{r}
-#pdf(file="Figures/SpearmanCorplot_nolab.pdf", width=9, height=5)
+pdf(file="Figures/SpearmanCorplot_nolab.pdf", width=9, height=5)
 par(mfrow = c(1, 2), oma=c(0,0,2,0))
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="A)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="B)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
-#dev.off()
+dev.off()
 ```
 
 
