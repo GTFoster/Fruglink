@@ -46,9 +46,14 @@ library(phytools)
 ## 3. Run Randomforest on Test-train split w/Replicates
 ## 4. Run Randomforest on Full Network w/Replicates
 
+```{r}
+set.seed(24601) #Jean Valjean
+```
+
 
 ## 1. Data Handling
 ```{r}
+tictoc::tic()
 dat <- read.csv("Data.nosync/DataSources/ATLANTIC_frugivory.csv")
 dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
@@ -63,6 +68,8 @@ dat$Frugivore_Species[dat$Frugivore_Species=="Aburria jacutinga"] <- "Pipile jac
 dat$Frug_Genus[dat$Frugivore_Species=="Pipile jacutinga"] <- "Pipile"
 dat$Frugivore_Species[dat$Frugivore_Species=="Myiothlypis flaveola"] <- "Basileuterus flaveolus"
 dat$Frug_Genus[dat$Frugivore_Species=="Basileuterus flaveolus"] <- "Basileuterus"
+dat$Frugivore_Species[dat$Frugivore_Species=="Baillonius bailloni"] <- "Pteroglossus bailloni"
+dat$Frug_Genus[dat$Frugivore_Species=="Basileuterus flaveolus"] <- "Pteroglossus"
 ```
 
 ```{r}
@@ -119,17 +126,17 @@ dat <- left_join(dat, dat_old) #add back in our factor columns just in case we w
 Add Decomposed Plant Phylogeny to dat
 Since we have only one phylogeny for plants, we do this once and assign the resultant eigenvectors as columns in our dataset. This isn't currently run, since we've amended the code to first include more species as polytomies when congenerics are available. 
 ```{r}
-#plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
+plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
 
-#sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 37.5% of variation
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 37.5% of variation
 
-#plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
-#colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
+plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
+colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
 
-#plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
+plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
 
-#dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
-#birds <- dplyr::filter(dat, Frug_Class=="Aves")
+dat <- left_join(dat, plant_PhyEig, by="Plant_Species")
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
 ```
 
 
@@ -199,7 +206,7 @@ birds <- svData(birds)
 
 Add names of the variables 
 ```{r}
-p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
+p_phylo <- c("c1PlPolyDecomp", "c2PlPolyDecomp", "c3PlPolyDecomp", "c4PlPolyDecomp")
 p_traits <- c("fruit_diameter", "fruit_length", "tree","liana", "palm", "scrub", "yellow", "red", "black", "brown", "green", "Lipid_Score")
 p_latent <- c("Psvd1", "Psvd2", "Psvd3")
 
@@ -360,33 +367,21 @@ woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FAL
 ```
 
 
-```{r}
-syns <- c("Aburria jacutinga", "Baillonius bailloni", "Myiothlypis flaveola", "Setophaga pitiayumi")
-tol <- taxize::tol_resolve(syns)
-tol$unique_name %in% gsub("_", " ", Bird_trees[[1]]$tip.label)
-
-birdlist<-c(unique(birds$Frugivore_Species), tol$unique_name, "Aburria aburri", "Setophaga ruticilla") #Including two species with only congenerics in ds missing from Jetz tree.
-
-#library(clipr)
-#clipr::write_clip(birdlist)
-```
-
-
 
 ## 3. Run Randomforest on Test-train split w/Replicates
-Run 100 times!
-```{r, eval=FALSE}
+Run 100 times! #CHANGE BACK TO FALSE
+```{r, eval=TRUE}
 split_output <- list()
 for(i in 1:100){
-    nas <- dplyr::filter(birds_temp, is.na(fc1)==TRUE) %>% dplyr::select(., Frugivore_Species) %>% unique() #Bird taxa that don't occur in our tree
+    nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
     genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
     nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
     nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
     nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
     ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
     polytree <- ult_birdTree #new tree object
-    for(i in 1:nrow(nas)){ #add in our missing genera as polytomies
-      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[i], where="root") #Create polytomy at the genera root. 
+    for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
     }
     #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
   
@@ -404,7 +399,6 @@ for(i in 1:100){
   rebalancedRF_TraitsLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE)
   rebalancedRF_PhyLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE)
   rebalancedRF_Trio <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE)
-
   
   temp <- list(Phy=rebalancedRF_Phy, 
                Traits=rebalancedRF_Traits,
@@ -417,6 +411,8 @@ for(i in 1:100){
                )
   split_output[[i]] <- temp
 }
+
+
 save(split_output, file="Data.nosync/Results/ttsplitReplicateRF_withJ.Rda")
 ```
 
@@ -426,9 +422,21 @@ Run 100 times!
 ```{r, eval=FALSE}
 full_output <- list()
 for(i in 1:100){
+    nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
+    genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
+    nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+    nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+    nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+    ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
+    polytree <- ult_birdTree #new tree object
+    for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
+    }
+    #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+  
   #Set up Phylogeny
-  frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
-  frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+  frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+  frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
   colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
   frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
   birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
@@ -456,13 +464,25 @@ save(full_output, file="Data.nosync/Results/fullReplicateRF_predicts.Rda")
 ```
 
 
-Rfob Version
-```{r, eval=FALSE}
+Rfob Version #CHANGE BACK TO FALSE
+```{r, eval=TRUE}
 rf_output <- list()
 for(i in 1:100){
+    nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
+    genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
+    nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+    nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+    nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+    ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
+    polytree <- ult_birdTree #new tree object
+    for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
+    }
+    #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+  
   #Set up Phylogeny
-  frug_litter <- PVR::PVRdecomp(phy=Bird_trees[[round(i)]], type="newick", scale=TRUE)
-  frug_PhyEig <-data.frame(Bird_trees[[5]]$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+  frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+  frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
   colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
   frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
   birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
@@ -491,8 +511,8 @@ for(i in 1:100){
 save(rf_output, file="Data.nosync/Results/fullReplicateRF_rfobs.Rda")
 ```
 
-Loading in the results of the above analyses
-```{r}
+Loading in the results of the above analyses #CHANGE BACK TO TRUE
+```{r, eval=FALSE}
 load("Data.nosync/Results/fullReplicateRF_predicts.Rda")
 load("Data.nosync/Results/fullReplicateRF_rfobs.Rda")
 load("Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
@@ -502,17 +522,22 @@ load("Data.nosync/FullData/ttsplitReplicateRF_withJ.Rda")
 Performance Metrics: After Test-Trait Split
 
 Create a summary data frame summarizing the performance of the split outputs. These values are presented in figure one of the manuscript.
+
+
 ```{r}
 performance <- NULL
 for(i in 1:100){
-  for(j in 1:7){
-    temp <- data.frame(model=names(split_output[[i]])[j],
-                          run=i,
-                          acc=split_output[[i]][[j]]$acc,
-                          auc=split_output[[i]][[j]]$auc,
-                          mrse=split_output[[i]][[j]]$mrse,
-                          H=split_output[[i]][[j]]$H)
-    performance <- rbind(performance, temp)
+  performance <- NULL
+  for(i in 1:100){
+    for(j in 1:7){
+      temp <- data.frame(model=names(split_output[[i]])[j],
+                            run=i,
+                            acc=split_output[[i]][[j]]$acc,
+                            auc=split_output[[i]][[j]]$auc,
+                            mrse=split_output[[i]][[j]]$mrse,
+                            H=split_output[[i]][[j]]$H)
+      performance <- rbind(performance, temp)
+    }
   }
 }
 
@@ -557,6 +582,7 @@ var.share <- function(rf.obj, members) {
 
 
 ```{r}
+output <- rf_output
 temp <- NULL
 for(i in 1:100){
   # Phy
@@ -592,10 +618,10 @@ phytraitstemp <- group.importance(rf.obj=output[[i]]$PhyTraits, groups=list(
               FrugPhy1="fc1",
               FrugPhy2="fc2",
               FrugPhy3="fc3",
-              Plantphy1="c1PlDecomp",
-              Plantphy2="c2PlDecomp",
-              Plantphy3="c3PlDecomp",
-              Plantphy4="c4PlDecomp"))
+              Plantphy1="c1PlPolyDecomp",
+              Plantphy2="c2PlPolyDecomp",
+              Plantphy3="c3PlPolyDecomp",
+              Plantphy4="c4PlPolyDecomp"))
 temp <- rbind(temp, data.frame(giniDec=phytraitstemp, model="PhyTraits", run=i, trait=rownames(phytraitstemp)))
 rm(phytraitstemp)
  #TraitsLatent
@@ -628,10 +654,10 @@ phylatenttemp <- group.importance(rf.obj=output[[i]]$PhyLatent, groups=list(
               FrugPhy1="fc1",
               FrugPhy2="fc2",
               FrugPhy3="fc3",
-              Plantphy1="c1PlDecomp",
-              Plantphy2="c2PlDecomp",
-              Plantphy3="c3PlDecomp",
-              Plantphy4="c4PlDecomp"))
+              Plantphy1="c1PlPolyDecomp",
+              Plantphy2="c2PlPolyDecomp",
+              Plantphy3="c3PlPolyDecomp",
+              Plantphy4="c4PlPolyDecomp"))
 temp <- rbind(temp, data.frame(giniDec=phylatenttemp, model="PhyLatent", run=i, trait=rownames(phylatenttemp)))
 rm(phylatenttemp)
  #Trio
@@ -653,10 +679,10 @@ triotemp <- group.importance(rf.obj=output[[i]]$Trio, groups=list(
               FrugPhy1="fc1",
               FrugPhy2="fc2",
               FrugPhy3="fc3",
-              Plantphy1="c1PlDecomp",
-              Plantphy2="c2PlDecomp",
-              Plantphy3="c3PlDecomp",
-              Plantphy4="c4PlDecomp"))
+              Plantphy1="c1PlPolyDecomp",
+              Plantphy2="c2PlPolyDecomp",
+              Plantphy3="c3PlPolyDecomp",
+              Plantphy4="c4PlPolyDecomp"))
 temp <- rbind(temp, data.frame(giniDec=triotemp, model="Trio", run=i, trait=rownames(triotemp)))
 rm(triotemp)
 }
@@ -747,8 +773,8 @@ ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position
 Look at the correlation between model predicted link suitabilities. This data is used to generate figure 3 from the manuscript. 
 
 
-
-```{r, eval=FALSE}
+#CHANGE BACK TO FALSE
+```{r, eval=TRUE}
 #Extracting all predictions from all replicates takes a while-saved as an output object for conenience
 fullnetworkPredicts <- NULL
 for(i in 1:100){
@@ -757,7 +783,7 @@ for(i in 1:100){
     temp$model <- names(full_output[[i]][j])
     temp$run <- i
     fullnetworkPredicts <- rbind(fullnetworkPredicts, temp)
-  }
+  } 
 }
 
 fullPredictsSummary <- fullnetworkPredicts %>% group_by(., model, Frugivore_Species, Plant_Species) %>% dplyr::summarise(., avg=mean(S), std=sd(S))
@@ -915,4 +941,5 @@ for(a in 1:7){
 
 compTable <- as.data.frame(compTable)
 compTable
+time <- tictoc::toc()
 ```
