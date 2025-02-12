@@ -3,21 +3,23 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ## ---- eval=FALSE-------------------------------------------------------------------------------
-install.packages("tidyverse")
-install.packages("magrittr")
-install.packages("igraph")
-install.packages("pROC")
-install.packages("BIEN")
-install.packages("np")
-install.packages("PVR")
-install.packages("ape")
-install.packages("phytools")
-install.packages("tictoc")
-install.packages("corrplot")
-
+#install.packages("tidyverse")
+#install.packages("magrittr")
+#install.packages("igraph")
+#install.packages("pROC")
+#install.packages("BIEN")
+#install.packages("np")
+#install.packages("PVR")
+#install.packages("ape")
+#install.packages("phytools")
+#install.packages("tictoc")
+#install.packages("corrplot")
+#install.packages("randomForest")
 
 ## ----------------------------------------------------------------------------------------------
-library(tidyverse)
+#library(tidyverse)
+library(dplyr)
+library(ggplot2)
 library(magrittr)
 library(igraph)
 library(pROC)
@@ -25,18 +27,18 @@ library(BIEN)
 library(np)
 library(PVR)
 library(ape)
-library("phytools")
+library(phytools)
 #library(tictoc)
 library(corrplot)
 library(phytools)
-
+library(tidyr)
+library(randomForest)
 
 ## ----------------------------------------------------------------------------------------------
 set.seed(24601) #Jean Valjean
 
 
-## ----------------------------------------------------------------------------------------------
-tictoc::tic()
+## ---------------------------------------------------------------------------------------------
 dat <- read.csv("Data.nosync/DataSources/ATLANTIC_frugivory.csv")
 dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
 dat <- dplyr::select(dat, -ID, -Latitude, -Longitude, -Study_Location, -Precision, -Study_Method, -Study.reference, -Doi.Link, -Frug_Population_Trend, -Frug_Migration_status)
@@ -871,5 +873,4 @@ for(a in 1:7){
 
 compTable <- as.data.frame(compTable)
 compTable
-time <- tictoc::toc()
 

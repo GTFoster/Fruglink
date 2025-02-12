@@ -215,6 +215,10 @@ f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "Frugivory_score")
 f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
 ```
 
+```{r}
+500%/%5
+```
+
 ## 2. Set up Randomforest
 
 This function gets our accuracy measures
@@ -307,7 +311,7 @@ woodedWalk <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, bala
   test$S <- predictions[,2]
   
   if(returnTestTrain==TRUE){
-    model=list(rfModel=rf,test=test, train=train)
+    model=list(rfModel=rf, test=test, train=train)
   }
   if(returnTestTrain==FALSE){
     model<- rf
@@ -369,8 +373,8 @@ woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FAL
 
 
 ## 3. Run Randomforest on Test-train split w/Replicates
-Run 100 times! #CHANGE BACK TO FALSE
-```{r, eval=TRUE}
+Run 100 times! By default this is set to eval=FALSE in order to reduce overall runtime, but to run it just change to TRUE. (The output object is included below)
+```{r, eval=False}
 split_output <- list()
 for(i in 1:100){
     nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
@@ -464,8 +468,8 @@ save(full_output, file="Data.nosync/Results/fullReplicateRF_predicts.Rda")
 ```
 
 
-Rfob Version #CHANGE BACK TO FALSE
-```{r, eval=TRUE}
+Rfob Version
+```{r, eval=FALSE}
 rf_output <- list()
 for(i in 1:100){
     nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
@@ -743,7 +747,7 @@ colKey[grepl("Phylogeny", colKey)==TRUE] <- Trio_Colors[1]
 colKey[grepl("SVD", colKey)==TRUE] <- Trio_Colors[3]
 colKey[grepl("#", colKey)==FALSE] <- Trio_Colors[2]
 
-pdf(file="Figures/VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
+#pdf(file="Figures/VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
 ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
   scale_fill_manual(values = alpha(c("Phy" = "#ff2929",
                                 "Traits" = "#E0E411",
@@ -774,7 +778,7 @@ Look at the correlation between model predicted link suitabilities. This data is
 
 
 #CHANGE BACK TO FALSE
-```{r, eval=TRUE}
+```{r, eval=F}
 #Extracting all predictions from all replicates takes a while-saved as an output object for conenience
 fullnetworkPredicts <- NULL
 for(i in 1:100){
@@ -787,7 +791,7 @@ for(i in 1:100){
 }
 
 fullPredictsSummary <- fullnetworkPredicts %>% group_by(., model, Frugivore_Species, Plant_Species) %>% dplyr::summarise(., avg=mean(S), std=sd(S))
-#write.csv(fullPredictsSummary,"Data.nosync/Results/fullNetPredictSummary.csv", row.names = FALSE)
+write.csv(fullPredictsSummary,"Data.nosync/Results/fullNetPredictSummary.csv", row.names = FALSE)
 ```
 
 Load in our prediction and look at "true" values based on our existing dataset
@@ -827,7 +831,6 @@ corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, order = "AOE", ma
 Some different visualizations of these corplots. 
 ```{r, eval=FALSE}
 pdf(file="ESA_Figs/CorrPlots.pdf", width=8.5, height=11)
-
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="Spearman: All Links", mar=c(0,0,2,0), method="ellipse")
 corrplot::corrplot(corr.matrix_full, type = "lower", diag=T, main="Pearson: All Links", mar=c(0,0,2,0), method="ellipse")
@@ -843,7 +846,7 @@ corrplot::corrplot(corr.matrix_unreal, type = "lower", diag=T, main="Pearson: Un
 dev.off()
 
 
-pdf(file="ESA_Figs/MixedCorrPlots.pdf", width=8.5, height=9.2)
+#pdf(file="ESA_Figs/MixedCorrPlots.pdf", width=8.5, height=9.2)
 par(mfrow = c(2, 2), oma=c(0,0,2,0))
 corrplot::corrplot.mixed(spear.matrix_full, 
 	lower='number', upper='ellipse',
@@ -880,11 +883,11 @@ corrplot::corrplot.mixed(corr.matrix_unreal,
 
 Below is the plot as it appears in the figure
 ```{r}
-pdf(file="Figures/SpearmanCorplot_nolab.pdf", width=9, height=5)
+#pdf(file="Figures/SpearmanCorplot_nolab.pdf", width=9, height=5)
 par(mfrow = c(1, 2), oma=c(0,0,2,0))
 corrplot::corrplot(spear.matrix_full, type = "lower", diag=T, main="A)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
 corrplot::corrplot(spear.matrix_unreal, type = "lower", diag=T, main="B)", mar=c(0,0,2,0), method="ellipse", cl.ratio=0.1)
-dev.off()
+#dev.off()
 ```
 
 
@@ -943,3 +946,9 @@ compTable <- as.data.frame(compTable)
 compTable
 time <- tictoc::toc()
 ```
+
+
+```{r}
+
+```
+

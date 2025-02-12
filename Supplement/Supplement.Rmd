@@ -97,6 +97,503 @@ hist(table(birds$Plant_Species), xlab="Degree", ylab="Observed Frequency", main=
 **Figure S2:** Observed degree distribution of avian frugivore species included in our analyses. X-axis represents node degree, or number of unique partners. Degree on average tended to be lower for plants than frugivores; plant node degree ranged from 1 (128 species) to 80 unique frugivorous interactions recorded for \emph{Myrsine coriacea}; median plant degree was `r median(table(dat$Frugivore_Species))`.
 
 
+## Impact of Phylogenetic Imputation
+In our main text results, for the 46 plant species and 2 bird species which did not appear in the appropriate phylogenies but did have congenerics, we randomly assigned those species to be a polytomy within their parent genera. When these species are excluded from the analysis, our results are still qualitatively indistinguishable. Below are versions of the three main-text figures with those 48 species removed from the network. 
+
+![]("fig1_nopoly.png")
+
+**Figure S3:** Summary performance metrics of all 7 models *when species without full phylogenetic information are excluded*, as measured by area under the receiver operating characteristic curve (AUC) and root mean squared error (RMSE); highest performing models for each metric are outlined in black. Mean metric values are presented from 100 replicates of each model structure alongside standard deviation. As in the main text, model discriminatory power between links and non-links is maximized by including latent structural features, with the inclusion of trait, phylogenetic information, or both actually slightly decreasing discriminatory power. However, inclusion of trait and phylogenetic information, while not improving AUC, does increase overall model accuracy as measured by mean root squared error.
+
+
+
+![]("fig2_nopoly.pdf")
+
+**Figure S4:** Variable importance across all models as measure by Gini importance score *when species without full phylogenetic information are excluded*; color scheme is consistent with figure S3. As in the maintext,latent traits were consistently the most important variables for prediction. These were followed by continuous frugivore traits (body mass, gape size), and frugivore phylogenetic axes. Plant phylogenies and continuous trait information were generally less important for prediction than frugivore traits. Categorical plant traits (Lipid content, fruit color, growth form) were the least important variables for prediction.
+
+![]("fig3_nopoly.pdf")
+
+**Figure S4:** Pairwise Spearman's rank correlations of link suitabilities across models for all potential interaction (A), as well as only unobserved interactions (B), *after species without full phylogenetic information are excluded*. The latter set of links represents both true forbidden links, as well as other potential interactions not observed in our data-set.
+
+
+
+### Sensitivity to Class Imbalances
+In order to deal with the high degree of sparceness in our network, we trim the training set to enforce class balancing. In the maintext, we present the results of a 3:1 ratio unobserved:observed links. Here, show the methods is relatively insensitive to this exact proportion by repeating our analysis with alternative training ratios of 1:1 and 1:10.
+
+![](AUC_Ratio.pdf)
+
+**Figure S5:** Supplemental caption for my figure
+
+
+![](suitability_comp_unscaled.pdf)
+
+**Figure S6:** Supplemental caption for my other
+
+
+```{r, eval=FALSE, echo=FALSE}
+split_output_1.1Ratio <- list()
+for(i in 1:100){
+    nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
+    genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
+    nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+    nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+    nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+    ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
+    polytree <- ult_birdTree #new tree object
+    for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
+    }
+    #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+  
+  #Set up Phylogeny
+  frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+  frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+  colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
+  frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
+  birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
+  
+  rebalancedRF_Phy <- woodedWalk(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE, balance_ratio = 1)
+  rebalancedRF_Traits <- woodedWalk(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE, balance_ratio = 1 )
+  rebalancedRF_Latent <- woodedWalk(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE, balance_ratio = 1)
+  rebalancedRF_PhyTraits <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE, balance_ratio = 1)
+  rebalancedRF_TraitsLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE, balance_ratio = 1)
+  rebalancedRF_PhyLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE, balance_ratio = 1)
+  rebalancedRF_Trio <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE, balance_ratio = 1)
+  
+  temp <- list(Phy=rebalancedRF_Phy, 
+               Traits=rebalancedRF_Traits,
+               Latent=rebalancedRF_Latent,
+               PhyTraits=rebalancedRF_PhyTraits,
+               TraitsLatent=rebalancedRF_TraitsLatent,
+               PhyLatent=rebalancedRF_PhyLatent,
+               Trio=rebalancedRF_Trio,
+               run=i
+               )
+  split_output_1.1Ratio[[i]] <- temp
+}
+
+
+split_output_1.10Ratio <- list()
+for(i in 1:100){
+    nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
+    genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
+    nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+    nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+    nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+    ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
+    polytree <- ult_birdTree #new tree object
+    for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
+    }
+    #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+  
+  #Set up Phylogeny
+  frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+  frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+  colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
+  frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
+  birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
+  
+  rebalancedRF_Phy <- woodedWalk(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE, balance_ratio = 10)
+  rebalancedRF_Traits <- woodedWalk(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE, balance_ratio = 10 )
+  rebalancedRF_Latent <- woodedWalk(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE, balance_ratio = 10)
+  rebalancedRF_PhyTraits <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE, balance_ratio = 10)
+  rebalancedRF_TraitsLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE, balance_ratio = 10)
+  rebalancedRF_PhyLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE, balance_ratio = 10)
+  rebalancedRF_Trio <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE, balance_ratio = 10)
+  
+  temp <- list(Phy=rebalancedRF_Phy, 
+               Traits=rebalancedRF_Traits,
+               Latent=rebalancedRF_Latent,
+               PhyTraits=rebalancedRF_PhyTraits,
+               TraitsLatent=rebalancedRF_TraitsLatent,
+               PhyLatent=rebalancedRF_PhyLatent,
+               Trio=rebalancedRF_Trio,
+               run=i
+               )
+  split_output_1.10Ratio[[i]] <- temp
+}
+
+save(split_output_1.10Ratio, split_output_1.1Ratio, file="../Data.nosync/Results/Variable_BalancRatios.Rda")
+```
+
+Extracting the performance metrics from our alternative balance ratio runs. 
+```{r, eval=FALSE, echo=FALSE}
+
+load("../Data.nosync/Results/Variable_BalancRatios.Rda")
+performance1.10 <- NULL
+for(i in 1:100){
+  performance1.10 <- NULL
+  for(i in 1:100){
+    for(j in 1:7){
+      temp <- data.frame(model=names(split_output_1.10Ratio[[i]])[j],
+                            run=i,
+                            acc=split_output_1.10Ratio[[i]][[j]]$acc,
+                            auc=split_output_1.10Ratio[[i]][[j]]$auc,
+                            mrse=split_output_1.10Ratio[[i]][[j]]$mrse,
+                            H=split_output_1.10Ratio[[i]][[j]]$H)
+      performance1.10 <- rbind(performance1.10, temp)
+    }
+  }
+}
+
+performance1.1 <- NULL
+for(i in 1:100){
+  performance1.1 <- NULL
+  for(i in 1:100){
+    for(j in 1:7){
+      temp <- data.frame(model=names(split_output_1.1Ratio[[i]])[j],
+                            run=i,
+                            acc=split_output_1.1Ratio[[i]][[j]]$acc,
+                            auc=split_output_1.1Ratio[[i]][[j]]$auc,
+                            mrse=split_output_1.1Ratio[[i]][[j]]$mrse,
+                            H=split_output_1.1Ratio[[i]][[j]]$H)
+      performance1.1 <- rbind(performance1.1, temp)
+    }
+  }
+}
+
+performance$ratio <- 3
+performance1.1$ratio <- 1
+performance1.10$ratio <- 10
+
+ratioperf <- rbind(performance, performance1.1, performance1.10)
+save(ratioperf, file="performance_metrics_prevalence.RDA")
+```
+
+```{r, eval=FALSE, echo=FALSE}
+#pdf("AUC_Ratio.pdf")
+ggplot(data=ratioperf, aes(y=auc, x=as.factor(model), fill=as.factor(ratio)))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("AUC Predicting Test Set")+
+  xlab("Model")+
+  guides(fill=guide_legend("Ratio of \npositive:negative \ncases in \ntraining set"))+
+  scale_fill_discrete(labels=c("1:1 (50%)", "1:3 (25%)", "1:10 (9%)"))
+#dev.off()
+
+#pdf(file="MRSE_Ratio.pdf", width=6, height=6)
+ggplot(data=ratioperf, aes(y=mrse, x=as.factor(model), fill=as.factor(ratio)))+
+  geom_boxplot(lwd=0.1, outlier.size=0.2)+
+  theme_classic()+
+  ylab("MRSE Predicting Test Set")+
+  xlab("Model")+
+  guides(fill=guide_legend("Ratio of \npositive:negative \ncases in \ntraining set"))+
+  scale_fill_discrete(labels=c("1:1 (50%)", "1:3 (25%)", "1:10 (9%)"))
+#dev.off()
+```
+
+So changing the balance ratio (as long as you're keeping it within a reasonable range), doesn't seem to have much an impact on AUC prediction on the test set. It changes the absolute values of MRSE, with the lowest value of MRSE occuring in the 1:3 balancing ration here (which we present in the main text), but qualitatively doesn't change relative ranking of the models Across all balancing ratios, we see the same relative position of models trained on different information. 
+
+Let's further compare the effects on variable importance below. 
+
+```{r, eval=FALSE, echo=FALSE}
+split_output_1.1Ratio.rf <- list()
+for(i in 1:100){
+    nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
+    genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
+    nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+    nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+    nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+    ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
+    polytree <- ult_birdTree #new tree object
+    for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
+    }
+    #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+  #Set up Phylogeny
+  frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+  frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+  colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
+  frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
+  birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
+  
+  rebalancedRF_Phy <- woodedWalk(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE, balance_ratio = 1, output_type = "rfobject")
+  rebalancedRF_Traits <- woodedWalk(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE, balance_ratio = 1 , output_type = "rfobject")
+  rebalancedRF_Latent <- woodedWalk(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE, balance_ratio = 1, output_type = "rfobject")
+  rebalancedRF_PhyTraits <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE, balance_ratio = 1, output_type = "rfobject")
+  rebalancedRF_TraitsLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE, balance_ratio = 1, output_type = "rfobject")
+  rebalancedRF_PhyLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE, balance_ratio = 1, output_type = "rfobject")
+  rebalancedRF_Trio <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE, balance_ratio = 1, output_type = "rfobject")
+  
+  temp <- list(Phy=rebalancedRF_Phy, 
+               Traits=rebalancedRF_Traits,
+               Latent=rebalancedRF_Latent,
+               PhyTraits=rebalancedRF_PhyTraits,
+               TraitsLatent=rebalancedRF_TraitsLatent,
+               PhyLatent=rebalancedRF_PhyLatent,
+               Trio=rebalancedRF_Trio,
+               run=i
+               )
+  split_output_1.1Ratio.rf[[i]] <- temp
+}
+
+save(split_output_1.1Ratio.rf, file="../Data.nosync/Results/Variable_BalancRatios_Rfob.Rda")
+```
+
+Let's grab the variable importance summary for this update object
+```{r, eval=FALSE, echo=FALSE}
+
+temp <- NULL
+for(i in 1:100){
+  # Phy
+temp <- rbind(temp, data.frame(giniDec=split_output_1.1Ratio.rf[[i]]$Phy$importance, model="Phy", run=i, trait=c("FrugPhy1", "FrugPhy2", "FrugPhy3", "Plantphy1", "Plantphy2", "Plantphy3","Plantphy4")))
+
+
+ # Traits
+traitstemp <- group.importance(rf.obj=split_output_1.1Ratio.rf[[i]]$Traits, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score")
+               )
+temp <- rbind(temp, data.frame(giniDec=traitstemp, model="Traits", run=i, trait=rownames(traitstemp)))
+rm(traitstemp)
+ #Latent
+temp <- rbind(temp, data.frame(giniDec=split_output_1.1Ratio.rf[[i]]$Latent$importance, model="Latent", run=i, trait=c("p_latent1", "p_latent2","p_latent3","f_latent1","f_latent2","f_latent3")))
+
+ #PhyTraits
+phytraitstemp <- group.importance(rf.obj=split_output_1.1Ratio.rf[[i]]$PhyTraits, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlPolyDecomp",
+              Plantphy2="c2PlPolyDecomp",
+              Plantphy3="c3PlPolyDecomp",
+              Plantphy4="c4PlPolyDecomp"))
+temp <- rbind(temp, data.frame(giniDec=phytraitstemp, model="PhyTraits", run=i, trait=rownames(phytraitstemp)))
+rm(phytraitstemp)
+ #TraitsLatent
+traitslatenttemp <- group.importance(rf.obj=split_output_1.1Ratio.rf[[i]]$TraitsLatent, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3"))
+
+temp <- rbind(temp, data.frame(giniDec=traitslatenttemp, model="TraitsLatent", run=i, trait=rownames(traitslatenttemp)))
+rm(traitslatenttemp)
+ #PhyLatent
+phylatenttemp <- group.importance(rf.obj=split_output_1.1Ratio.rf[[i]]$PhyLatent, groups=list(
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlPolyDecomp",
+              Plantphy2="c2PlPolyDecomp",
+              Plantphy3="c3PlPolyDecomp",
+              Plantphy4="c4PlPolyDecomp"))
+temp <- rbind(temp, data.frame(giniDec=phylatenttemp, model="PhyLatent", run=i, trait=rownames(phylatenttemp)))
+rm(phylatenttemp)
+ #Trio
+triotemp <- group.importance(rf.obj=split_output_1.1Ratio.rf[[i]]$Trio, groups=list(
+                growthform=c("tree","liana", "palm", "scrub"), 
+               fruitcolor=c("yellow", "red", "black", "brown", "green"),
+               LipidScore=c("Lipid_Score"),
+               fruit_diameter=c("fruit_diameter"),
+               fruit_length=c("fruit_length"),
+              Frug_Body_Mass="Frug_Body_Mass",
+              Frug_Mean_Gape_Size="Frug_Mean_Gape_Size",
+              FrugScore="Frugivory_score",
+              p_latent1="Psvd1",
+              p_latent2="Psvd2",
+              p_latent3="Psvd3",
+              f_latent1="Fsvd1",
+              f_latent2="Fsvd2",
+              f_latent3="Fsvd3",
+              FrugPhy1="fc1",
+              FrugPhy2="fc2",
+              FrugPhy3="fc3",
+              Plantphy1="c1PlPolyDecomp",
+              Plantphy2="c2PlPolyDecomp",
+              Plantphy3="c3PlPolyDecomp",
+              Plantphy4="c4PlPolyDecomp"))
+temp <- rbind(temp, data.frame(giniDec=triotemp, model="Trio", run=i, trait=rownames(triotemp)))
+rm(triotemp)
+}
+
+varimport_1.1Ratio <- temp
+
+#varimporSummary <- varimport %>% dplyr::group_by(., model, trait) %>%VarImportance_Err dplyr::summarise(avg=(mean(MeanDecreaseGini)/max(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)/MeanDecreaseGini))
+
+varimport_1.1RatioSummary <- varimport_10.1Ratio %>% dplyr::group_by(., model, trait) %>% dplyr::summarise(avg=(mean(MeanDecreaseGini)), sd=sd((MeanDecreaseGini)))
+
+varimport_1.1RatioSummary$trait %<>% as.factor()
+
+varimporSummary$avg1.1 <- varimport_1.1RatioSummary$avg #Add 
+varimporSummary$sd1.1 <- varimport_1.1RatioSummary$sd
+```
+Comparing the distribution of Relative Importance Values
+```{r, eval=FALSE, echo=FALSE}
+varimporSummary2 <- varimporSummary
+varimporSummary2 <- varimporSummary2 %>% group_by(model) %>% mutate(relav_base=avg/max(avg), relav_1.1=avg1.1/max(avg1.1))
+
+varimporSummary2 <- varimporSummary2 %>% group_by(model) %>% mutate(relav_sd=sd/max(avg), relsd_1.1=sd1.1/max(avg1.1))
+
+varimporSummary2$class <- NA
+varimporSummary2$class[grepl("latent", varimporSummary2$trait)] <- "Latent"
+varimporSummary2$class[grepl("hy", varimporSummary2$trait)] <- "Phylo"
+varimporSummary2$class[is.na(varimporSummary2$class)==TRUE] <- "Trait"
+save(varimporSummary2, file="Supplemental_Varimport_ratios.RDA")
+```
+
+
+```{r, eval=FALSE, echo=FALSE}
+load("Supplemental_Varimport_ratios.RDA")
+
+#pdf("Importance_by_Ratio.pdf", width=11, height=8.5)
+varimporSummary2 %>% 
+ggplot(data=., aes(x=relav_base, y=relav_1.1, color=as.factor(class)))+
+  geom_segment(aes(x=0, y=0, xend=1, yend=1), col="black", lty=2)+
+  xlab("Relative Variable Importance, 1:3 Ratio")+
+  ylab("Relative Importance, 1:1 Ratio")+
+  theme_classic()+
+  geom_errorbar(aes(xmin = relav_base-1.96*relav_sd, xmax = relav_base+1.96*relav_sd), width = 0, col="darkgrey")+
+  geom_errorbar(aes(ymin = relav_1.1-1.96*relsd_1.1, ymax = relav_1.1+1.96*relsd_1.1), width = 0, col="darkgrey")+
+  geom_point(size=2, alpha=0.75)+facet_wrap(~model, nrow=2)+
+  guides(color=guide_legend(title="Feature Type"))+
+  theme(legend.position = c(0.85, 0.2), legend.text=element_text(size=16), legend.title=element_text(size=16))
+#dev.off()
+
+```
+
+Comparing actual suitability difference
+```{r, eval=FALSE, echo=FALSE}
+save(file="prereqs.rda", birds, Bird_trees, woodedWalk)
+suitout <- NULL
+for(ratioval in c(1, 3, 10)){
+  for(i in 1:100){
+      nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
+      genera <- sub("_[^ ]+$", "", Bird_trees[[round(i)]]$tip.label) %>% unique() #Genera list present in our bird tree
+      nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+      nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+      nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+      ult_birdTree <- force.ultrametric(Bird_trees[[round(i)]]) #Our tree should already be ultrametric, but just in case
+      polytree <- ult_birdTree #new tree object
+      for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+        polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
+      }
+      #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+    
+    #Set up Phylogeny
+    frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+    frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+    colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
+    frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
+    birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
+    
+    rebalancedRF_Phy <- woodedWalk(birds_temp, FrugTraits = c(f_phylo), PlantTraits = c(p_phylo), class_balancing = TRUE, returnTestTrain=TRUE, balance_ratio = ratioval, output_type = "rfobject")
+    rebalancedRF_Phy_Suit <- rebalancedRF_Phy$test
+    rebalancedRF_Phy_Suit$S <- predict(rebalancedRF_Phy$rfModel, rebalancedRF_Phy_Suit, type="prob")[,1]
+    rebalancedRF_Phy_Suit$model <- "Phy"
+    rebalancedRF_Phy_Suit %<>% dplyr::select(., Frugivore_Species, Plant_Species, model, real, S)
+    
+    rebalancedRF_Traits <- woodedWalk(birds_temp, FrugTraits = c(f_traits), PlantTraits = c(p_traits), class_balancing = TRUE,  returnTestTrain=TRUE, balance_ratio = ratioval, output_type = "rfobject")
+    rebalancedRF_Traits_Suit <- rebalancedRF_Traits$test
+    rebalancedRF_Traits_Suit$S <- predict(rebalancedRF_Traits$rfModel, rebalancedRF_Traits_Suit, type="prob")[,1]
+    rebalancedRF_Traits_Suit$model <- "Traits"
+      rebalancedRF_Traits_Suit %<>% dplyr::select(., Frugivore_Species, Plant_Species, model, real, S)
+  
+    rebalancedRF_Latent <- woodedWalk(birds_temp, FrugTraits = c(f_latent), PlantTraits = c(p_latent), class_balancing = TRUE,  returnTestTrain=TRUE, balance_ratio = ratioval, output_type = "rfobject")
+    rebalancedRF_Latent_Suit <- rebalancedRF_Latent$test
+    rebalancedRF_Latent_Suit$S <- predict(rebalancedRF_Latent$rfModel, rebalancedRF_Latent_Suit, type="prob")[,1]
+    rebalancedRF_Latent_Suit$model <- "Latent"
+    rebalancedRF_Latent_Suit %<>% dplyr::select(., Frugivore_Species, Plant_Species, model, real, S)
+  
+    rebalancedRF_PhyTraits <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_traits), PlantTraits = c(p_phylo, p_traits), class_balancing = TRUE,  returnTestTrain=TRUE, balance_ratio = ratioval, output_type = "rfobject")
+    rebalancedRF_PhyTraits_Suit <- rebalancedRF_PhyTraits$test
+    rebalancedRF_PhyTraits_Suit$S <- predict(rebalancedRF_PhyTraits$rfModel, rebalancedRF_PhyTraits_Suit, type="prob")[,1]
+    rebalancedRF_PhyTraits_Suit$model <- "PhyTraits"
+    rebalancedRF_PhyTraits_Suit %<>% dplyr::select(., Frugivore_Species, Plant_Species, model, real, S)
+    
+    rebalancedRF_TraitsLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_traits), PlantTraits = c(p_latent, p_traits), class_balancing = TRUE,  returnTestTrain=TRUE, balance_ratio = ratioval, output_type = "rfobject")
+    rebalancedRF_TraitsLatent_Suit <- rebalancedRF_TraitsLatent$test
+    rebalancedRF_TraitsLatent_Suit$S <- predict(rebalancedRF_TraitsLatent$rfModel, rebalancedRF_TraitsLatent_Suit, type="prob")[,1]
+    rebalancedRF_TraitsLatent_Suit$model <- "TraitsLatent"
+    rebalancedRF_TraitsLatent_Suit %<>% dplyr::select(., Frugivore_Species, Plant_Species, model, real, S)
+    
+    rebalancedRF_PhyLatent <- woodedWalk(birds_temp, FrugTraits = c(f_latent, f_phylo), PlantTraits = c(p_latent, p_phylo), class_balancing = TRUE,  returnTestTrain=TRUE, balance_ratio = ratioval, output_type = "rfobject")
+    rebalancedRF_PhyLatent_Suit <- rebalancedRF_PhyLatent$test
+    rebalancedRF_PhyLatent_Suit$S <- predict(rebalancedRF_PhyLatent$rfModel, rebalancedRF_PhyLatent_Suit, type="prob")
+    rebalancedRF_PhyLatent_Suit$model <- "PhyLatent"
+    rebalancedRF_PhyLatent_Suit %<>% dplyr::select(., Frugivore_Species, Plant_Species, model, real, S)
+    
+    rebalancedRF_Trio <- woodedWalk(birds_temp, FrugTraits = c(f_phylo, f_latent, f_traits), PlantTraits = c(p_phylo, p_latent, p_traits), class_balancing = TRUE,  returnTestTrain=TRUE, balance_ratio = ratioval, output_type = "rfobject")
+    rebalancedRF_Trio_Suit <- rebalancedRF_Trio$test
+    rebalancedRF_Trio_Suit$S <- predict(rebalancedRF_Trio$rfModel, rebalancedRF_Trio_Suit, type="prob")[,1]
+    rebalancedRF_Trio_Suit$model <- "Trio"
+    rebalancedRF_Trio_Suit %<>% dplyr::select(., Frugivore_Species, Plant_Species, model, real, S)
+    
+    temp <- rbind(rebalancedRF_Traits_Suit,
+                  rebalancedRF_Phy_Suit,
+                  rebalancedRF_Latent_Suit,
+                  rebalancedRF_PhyTraits_Suit,
+                  rebalancedRF_PhyLatent_Suit,
+                  rebalancedRF_TraitsLatent_Suit,
+                  rebalancedRF_Trio_Suit)
+    temp$run <- i
+    temp$balanceratio <- ratioval
+    suitout <- rbind(temp, suitout)
+    print(paste(i, "complete of 100", sep=" "))
+  }
+}
+```
+
+
+```{r, eval=FALSE, echo=FALSE}
+suitsum <- group_by(suitout, Frugivore_Species, Plant_Species, model, balanceratio) %>%
+  dplyr::summarise(., S_mean=mean(S, na.rm=T), sd=sd(S, na.rm=T))
+
+widesuit <- pivot_wider(suitsum, names_from = balanceratio, values_from = c(sd, S_mean))
+```
+
+
+```{r, eval=FALSE, echo=FALSE}
+#Here's a default without scaling. 
+#pdf("suitability_comp_unscaled.pdf")
+ggplot(data=widesuit, aes(x=1-S_mean_1, y=1-S_mean_3, color=model))+
+  geom_point()+
+  theme_classic()+
+  xlab("Suitability under 1:1")+
+  ylab("Suitability under 1:3")+
+  geom_abline (slope=1, linetype = "dashed", color="Red")+
+  facet_wrap(~model)
+#dev.off()
+```
+
+
+
+```{r, eval=FALSE, echo=FALSE}
+Svals <- dplyr::group_by(suitout, Plant_Species, Frugivore_Species, model) %>% dplyr::summarise(., avgsuit=1-mean(S, na.rm=T), n=n()) #Change to the right scale (0 for unlikely link). 
+```
+
+
+
 ## References
 
 Gotelli N.J. (2000) Null model analysis of species co-occurrence patterns. Ecology, 81, 2606-2621

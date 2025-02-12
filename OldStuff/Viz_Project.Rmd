@@ -1,0 +1,240 @@
+---
+title: "DataViz"
+author: "Grant Foster"
+date: "2025-01-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(igraph)
+```
+
+
+```{r}
+dat <- read.csv("../Data.nosync/DataSources/ATLANTIC_frugivory.csv")
+dat %<>% dplyr::filter(., Frugivore_Species != "Carollia castanea") #This bat has an incorrect gape size, so it's filtered out
+#dat <- dplyr::select(dat, -Latitude, -Longitude)
+dat %<>% unique(.)
+birds <- dplyr::filter(dat, Frug_Class=="Aves")
+```
+
+```{r}
+birds <- dplyr::filter(birds, Frugivory_score==3)
+length(unique(birds$Frugivore_Species))
+length(unique(birds$Plant_Species))
+
+#Resolving some taxonomic changes to align with Jetz tree later
+birds$Frugivore_Species[birds$Frugivore_Species=="Aburria jacutinga"] <- "Pipile jacutinga"
+birds$Frug_Genus[birds$Frugivore_Species=="Pipile jacutinga"] <- "Pipile"
+birds$Frugivore_Species[birds$Frugivore_Species=="Myiothlypis flaveola"] <- "Basileuterus flaveolus"
+birds$Frug_Genus[birds$Frugivore_Species=="Basileuterus flaveolus"] <- "Basileuterus"
+birds$Frugivore_Species[birds$Frugivore_Species=="Baillonius bailloni"] <- "Pteroglossus bailloni"
+birds$Frug_Genus[birds$Frugivore_Species=="Basileuterus flaveolus"] <- "Pteroglossus"
+```
+
+```{r}
+Bird_trees <- ape::read.nexus("../Data.nosync/DataSources/VertLife_FrugBird/query2/output_larger.nex")[[1]]
+
+load("../Data.nosync/DataSources/BIEN_subtree.Rda")
+```
+
+```{r}
+
+birds <- dplyr::filter(birds, Frug_Epitetus!="")
+birds <- dplyr::filter(birds, Plant_specific.epiteth!="")
+colnames(birds)
+
+birds$Frugivore_Species <- gsub(" ", "_", birds$Frugivore_Species)
+birdtree <- ape::drop.tip(phy = Bird_trees, Bird_trees$tip.label[Bird_trees$tip.label %in% birds$Frugivore_Species==F])
+
+birds$Plant_Species <- gsub(" ", "_", birds$Plant_Species)
+
+planttree <- ape::drop.tip(phy = BIEN_subtree, BIEN_subtree$tip.label[BIEN_subtree$tip.label %in% birds$Plant_Species==F])
+birds <- dplyr::filter(birds, Plant_Species %in% planttree$tip.label==T)
+```
+
+
+```{r}
+
+#Create cophenetic distance matrix
+dmatrix <- stats::cophenetic(planttree) 
+#Standardize by the maximum value
+dmatrix <- dmatrix/max(dmatrix) 
+#String manipulation so tree tip names match
+
+comm <- as.data.frame.matrix(table(birds$Frugivore_Species, birds$Plant_Species))#Binary, unweighted intraction matrix.
+
+test_mpd <- picante::ses.mpd(comm, dmatrix, null.model = "independentswap", abundance.weighted=FALSE, runs = 999, iterations = 1000) 
+```
+
+```{r}
+pdf(file="phylo.pdf", width=4, height=8)
+plot(birdtree, 
+     type="tidy",
+     show.tip.label = F)
+dev.off()
+```
+
+
+```{r}
+birdnet <- graph_from_incidence_matrix(table(birds[,1:2]))
+birdnet <- graph_from_incidence_matrix(comm, directed=F)
+birdnet <- igraph::delete.vertices(birdnet, 24)
+
+LO <- layout_as_bipartite(birdnet)
+LO[,2] <- abs(1-LO[,2])
+
+key <- as.numeric(V(birdnet)$type)+1 #Birds first, then plants
+
+
+#birdtree$tip.label #The names of the order of the nodes
+node_order <- match(V(birdnet)$name[1:34], birdtree$tip.label)
+
+# Update the y-coordinates in the layout
+LO[1:34,1] <- node_order*20+100
+
+#Plot in a half moon
+
+r <- 600
+# Normalize y to fit in the range [-r, r]
+y_centered <- LO[35:nrow(LO),1] - mean(LO[35:nrow(LO),1])
+
+# Calculate the x-coordinates for the half-moon shape
+x <- sqrt(r^2 - y_centered^2)/450
+```
+
+
+```{r}
+LO[35:nrow(LO),2] <- x^1.2
+
+V(birdnet)$label <- V(birdnet)$name
+V(birdnet)$label[key==2] <- NA
+
+plantdeg <- igraph::degree(birdnet)[35:length(igraph::degree(birdnet))]
+LO[35:nrow(LO),1] <- order(plantdeg, decreasing = FALSE)*3
+
+V(birdnet)$label <- gsub("_", " ", V(birdnet)$label)
+
+```
+
+
+```{r}
+
+pal <- colorRampPalette(c("blue", "red"))
+
+node_order <- match(V(birdnet)$name[1:34], birdtree$tip.label)
+mpdrnk <-test_mpd$mpd.obs.z[node_order]
+
+palrmp <- pal(34)[rank(test_mpd$mpd.obs.z)]
+
+
+pdf(file="legend.blank.pdf")
+ggplot(test_mpd, aes(x=1:nrow(test_mpd), y=mpd.obs.z, col=mpd.obs.z))+
+  geom_point()+
+  scale_color_gradientn(colors=pal(34))+
+  theme(legend.position="bottom")
+dev.off()
+
+```
+
+```{r}
+t1 <- sapply(as.vector( V(birdnet)$label), FUN = strwidth,units='in')
+t2 <- (t1 - min(t1))/ (max(t1) - min(t1))*3+0.9
+
+plot(birdnet, 
+     vertex.label=V(birdnet)$label,
+ vertex.size=c(3,1.2)[key], 
+ layout=LO[,2:1],
+ vertex.label.font=3,
+ vertex.label.dist=t2,
+ vertex.label.degree=pi,
+ vertex.label.cex=0.75,
+ margin=-0.05,
+ vertex.label.color="black",
+ edge.color=adjustcolor("SkyBlue2", alpha.f = .2),
+ vertex.color=c(palrmp, rep("#41cd22", length(V(birdnet))-34)))
+```
+```{r}
+right <- full_output[[1]]$Trio
+right$Frugivore_Species <- gsub(" ", "_", right$Frugivore_Species)
+right$Plant_Species <- gsub(" ", "_", right$Plant_Species)
+
+right <- dplyr::filter(right, Frugivore_Species %in% birds$Frugivore_Species)
+right <- dplyr::filter(right, Plant_Species %in% birds$Plant_Species)
+
+missing <- dplyr::filter(right, real==0) %>% dplyr::filter(S>0.3) %>% dplyr::filter(., Frugivore_Species!="Pipile_jacutinga")
+
+IDs <- data.frame(name=V(birdnet)$name)
+
+IDs$ID <- 1:nrow(IDs)
+new <- NULL
+for(i in 1:nrow(missing)){
+  i1 <- IDs$ID[IDs$name==missing$Frugivore_Species[i]]
+  if(length(i1)<1){
+    next
+  }
+  i2 <- IDs$ID[IDs$name==missing$Plant_Species[i]]
+  new <- c(new, i1, i2)
+}
+
+E(birdnet)
+birdnedpred <-igraph::add.edges(birdnet, edges=new)
+```
+
+```{r}
+#pdf(file="Network1.pdf", width=11, height=8)
+plot(birdnedpred, 
+     vertex.label=V(birdnet)$label,
+ vertex.size=c(4,1.2)[key], 
+ layout=LO[,2:1],
+ vertex.label.font=3,
+ vertex.label.dist=t2-0.6,
+ vertex.label.degree=pi,
+ vertex.label.cex=.7,
+ margin=-0.05,
+ vertex.label.color="black",
+ edge.color=c(rep(adjustcolor("SkyBlue2", alpha.f = .2), length(E(birdnet))), rep("firebrick", 13)),
+ vertex.color=c(palrmp, rep("#41cd22", length(V(birdnet))-34)))
+#dev.off()
+
+
+ggplot()
+```
+```{r}
+w <- 1/cophenetic(birdtree)
+diag(w) <- 0
+nrow(w)
+
+nrow(test_mpd)
+
+test_mpd[rownames(test_mpd)%in%rownames(w),]$mpd.obs.z
+test_mpd$mpd.obs.z[node_order]
+
+q <- data.frame(name=colnames(w))
+q <- test_mpd %>% rownames_to_column(., var="name") %>% left_join(q, ., by="name")
+
+ape::Moran.I(q[,2], w, na.rm=T)
+test_mpd$mpd.obs.z[node_order]
+```
+
+```{r}
+library("sf")
+library("rnaturalearth")
+library("rnaturalearthdata")
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+pdf(file="SA_inset.pdf")
+ggplot(data = world) +
+    geom_sf()+theme_classic()+
+  geom_point(aes(x=Longitude, y=Latitude), data = birds, col="firebrick", alpha=0.5)+
+  xlim(c(-80,-35))+
+  ylim(c(-60,10))
+dev.off()
+```
+
