@@ -731,7 +731,7 @@ levels(varimporSummary$trait)[match("LipidScore",levels(varimporSummary$trait))]
 levels(varimporSummary$trait)[match("FrugScore",levels(varimporSummary$trait))] <- "Degree of Frugivory"
 
 
-Trio_Colors <- c("#ff2929", "#E0E411", "#11E0E4") #Phylo, Trait, Latent
+Trio_Colors <- c("#332288ff", "#44aa99ff", "#11E0E4") #Phylo, Trait, Latent
 ```
 
 This code creates figure 2 of the manuscript (inset key added seperately)
@@ -747,15 +747,15 @@ colKey[grepl("Phylogeny", colKey)==TRUE] <- Trio_Colors[1]
 colKey[grepl("SVD", colKey)==TRUE] <- Trio_Colors[3]
 colKey[grepl("#", colKey)==FALSE] <- Trio_Colors[2]
 
-#pdf(file="Figures/VarImportance_ErrBars_Short.pdf", width=7, height=3.5)
+#pdf(file="Figures/VarImportance_ErrBars_Short_col2.pdf", width=7, height=3.5)
 ggplot(data=varimporSummary, aes(y=trait2, x=avg, fill=model))+geom_col(position = position_dodge(), width = 0.9)+theme_classic()+
-  scale_fill_manual(values = alpha(c("Phy" = "#ff2929",
-                                "Traits" = "#E0E411",
-                                "Latent" = "#11E0E4",
-                                "PhyTraits" = "#ff9a57",
-                                "TraitsLatent" = "#79E27B",
-                                "PhyLatent" = "#7B79E2",
-                                "Trio" = "#a05a2c"
+  scale_fill_manual(values = alpha(c("Phy" = "#332288ff",
+                                "Traits" = "#44aa99ff",
+                                "Latent" = "#88cceeff",
+                                "PhyTraits" = "#117733ff",
+                                "TraitsLatent" = "#aa4499ff",
+                                "PhyLatent" = "#cc6677ff",
+                                "Trio" = "#ddcc77ff"
                                 ), 1.0))+
   geom_errorbar(aes(xmin=avg-sd, xmax=avg+sd), width=.1,
                  position=position_dodge(.9))+
@@ -791,7 +791,7 @@ for(i in 1:100){
 }
 
 fullPredictsSummary <- fullnetworkPredicts %>% group_by(., model, Frugivore_Species, Plant_Species) %>% dplyr::summarise(., avg=mean(S), std=sd(S))
-write.csv(fullPredictsSummary,"Data.nosync/Results/fullNetPredictSummary.csv", row.names = FALSE)
+#write.csv(fullPredictsSummary,"Data.nosync/Results/fullNetPredictSummary.csv", row.names = FALSE)
 ```
 
 Load in our prediction and look at "true" values based on our existing dataset
@@ -947,8 +947,14 @@ compTable
 time <- tictoc::toc()
 ```
 
-
+Including a bit of exploration of our top models. 
 ```{r}
+top <- dplyr::filter(x, Trio>quantile(x$Trio, .9995, na.rm=T))
+topbirds <- unique(sub("-.*", "", top$combo))
+
+median(table(birds$Frugivore_Species))
+table(birds$Frugivore_Species)[names(table(birds$Frugivore_Species)) %in% topbirds]
+median(table(birds$Frugivore_Species)[names(table(birds$Frugivore_Species)) %in% topbirds])
 
 ```
 

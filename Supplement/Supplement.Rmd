@@ -6,7 +6,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60), tidy=TRUE, warning = FALSE, message=FALSE)
 ```
 
 ```{r, quiet=TRUE, message=FALSE, echo=FALSE}
@@ -18,6 +18,7 @@ library(ape)
 library("phytools")
 library(picante)
 library(magrittr)
+library(kableExtra)
 ```
 
 ```{r, echo=FALSE}
@@ -68,6 +69,8 @@ We see that the number of frugivores whose plant partners are more significantly
 
 ```
 
+
+
 In our dataset, we observe interactions between `r length(unique(birds$Frugivore_Species))` unique frugivore species and `r length(unique(birds$Plant_Species))` unique plant species.
 
 ## Degree Distributions of Mutualistic Partners
@@ -96,6 +99,109 @@ hist(table(birds$Plant_Species), xlab="Degree", ylab="Observed Frequency", main=
 
 **Figure S2:** Observed degree distribution of avian frugivore species included in our analyses. X-axis represents node degree, or number of unique partners. Degree on average tended to be lower for plants than frugivores; plant node degree ranged from 1 (128 species) to 80 unique frugivorous interactions recorded for \emph{Myrsine coriacea}; median plant degree was `r median(table(dat$Frugivore_Species))`.
 
+```{r, echo=FALSE}
+Bird_trees <- ape::read.nexus("../Data.nosync/DataSources/VertLife_FrugBird/query2/output_larger.nex")
+
+    nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(1)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
+    genera <- sub("_[^ ]+$", "", Bird_trees[[round(1)]]$tip.label) %>% unique() #Genera list present in our bird tree
+    nas$genus <- sub(" [^ ]+$", "", nas$Frugivore_Species) #Extract only genera of the nas
+    nas <- nas[nas$genus %in% genera,] #Remove species without congeneric already in the tree
+    nas <- nas[grepl(" ", nas$Frugivore_Species)==TRUE,] #Remove interactions only assigned to the genus level-this leaves just 1 warbler species
+    ult_birdTree <- force.ultrametric(Bird_trees[[round(1)]], message=F) #Our tree should already be ultrametric, but just in case
+    polytree <- ult_birdTree #new tree object
+    for(j in 1:nrow(nas)){ #add in our missing genera as polytomies
+      polytree <- phytools::add.species.to.genus(tree=polytree, species=nas$Frugivore_Species[j], where="root") #Create polytomy at the genera root. 
+    }
+    #length(polytree$tip.label) - length(ult_birdTree$tip.label) #Number of net gained tips
+  
+  #Set up Phylogeny
+  frug_litter <- PVR::PVRdecomp(phy=polytree, type="newick", scale=TRUE)
+  frug_PhyEig <-data.frame(polytree$tip.label, frug_litter@Eigen$vectors[,1:3]) #take first three vectors and make them a dataframe
+  colnames(frug_PhyEig) <- c("Frugivore_Species", "fc1", "fc2", "fc3")
+  frug_PhyEig$Frugivore_Species <- gsub(pattern="_", replace=" ", x=frug_PhyEig$Frugivore_Species) 
+  birds_temp <- left_join(birds, frug_PhyEig, by="Frugivore_Species") #Make a new object that includes our phylo information
+
+svData <- function(dat){
+mat_assym <- as.data.frame.matrix(table(dat$Frugivore_Species, dat$Plant_Species)) #Rows = Frugivores, Columns = Plants
+
+decomp <- svd(mat_assym)#run svd decomposition
+u <- decomp$u #extract first 3 axis
+v <- data.frame(decomp$v) #I think this is the right dimension?
+
+plantsSVD <-data.frame(colnames(mat_assym), v[,1], v[,2], v[,3])
+colnames(plantsSVD) <- c("Plant_Species", "Psvd1", "Psvd2", "Psvd3")
+frugSVD <- data.frame(colnames(t(mat_assym)), u[,1], u[,2], u[,3])
+colnames(frugSVD) <- c("Frugivore_Species", "Fsvd1", "Fsvd2", "Fsvd3")
+
+dat_wP <- left_join(dat, plantsSVD, by="Plant_Species")
+dat_new <- left_join(dat_wP, frugSVD, by="Frugivore_Species")
+
+return(dat_new)
+}
+
+
+birds_temp <- svData(birds_temp) #Add in SVD
+
+
+load("../Data.nosync/DataSources/BIEN_subtree.Rda") #load in plant tree
+plant_litter <- PVR::PVRdecomp(phy=BIEN_subtree, type="newick", scale=TRUE)
+
+sum((round((plant_litter@Eigen$values)/sum((plant_litter@Eigen$values)),3)*100)[1:4]) #first three vectors contain about 37.5% of variation
+
+plant_PhyEig <-data.frame(BIEN_subtree$tip.label, plant_litter@Eigen$vectors[,1:5])
+colnames(plant_PhyEig) <- c("Plant_Species", paste(colnames(plant_PhyEig)[2:ncol(plant_PhyEig)], "PlDecomp", sep=""))
+
+plant_PhyEig$Plant_Species <- gsub(pattern="_", replace=" ", x=plant_PhyEig$Plant_Species)
+
+birds_temp <- left_join(birds_temp, plant_PhyEig, by="Plant_Species")
+```
+
+```{r, echo=FALSE}
+p_phylo <- c("c1PlDecomp", "c2PlDecomp", "c3PlDecomp", "c4PlDecomp")
+p_traits <- c("fruit_diameter", "Fruit_color", "Plant_Form", "Lipid_Score")
+p_latent <- c("Psvd1", "Psvd2", "Psvd3")
+
+f_phylo <- c("fc1", "fc2", "fc3")
+f_traits <- c("Frug_Body_Mass","Frug_Mean_Gape_Size", "Frugivory_score")
+f_latent <- c("Fsvd1", "Fsvd2", "Fsvd3")
+
+
+counTable <- data.frame(model=c("Latent", "Phy", "Traits", "PhyLatent", "PhyTraits", "TraitsLatent", "Trio"), 
+           nlinks=c(
+             nrow(dplyr::filter_at(birds_temp, vars(c(p_latent, f_latent)), all_vars(!is.na(.)))), #latent
+            nrow(dplyr::filter_at(birds_temp, vars(c(p_phylo, f_phylo)), all_vars(!is.na(.)))), #phy
+             nrow(dplyr::filter_at(birds_temp, vars(c(p_traits, f_traits)), all_vars(!is.na(.)))), #traits
+             nrow(dplyr::filter_at(birds_temp, vars(c(p_phylo, p_latent, f_phylo, f_latent)), all_vars(!is.na(.)))),
+             nrow(dplyr::filter_at(birds_temp, vars(c(p_phylo, p_traits, f_phylo, f_traits)), all_vars(!is.na(.)))),
+             nrow(dplyr::filter_at(birds_temp, vars(c(p_latent, p_traits, f_traits, f_latent)), all_vars(!is.na(.)))),
+             
+             nrow(dplyr::filter_at(birds_temp, vars(c(p_latent, p_traits, p_phylo, f_phylo, f_latent, f_traits)), all_vars(!is.na(.))))
+           ), 
+           nfrug=c( ###Defining Frugivores
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_latent, f_latent)), all_vars(!is.na(.)))$Frugivore_Species)), #latent
+            length(unique(dplyr::filter_at(birds_temp, vars(c(p_phylo, f_phylo)), all_vars(!is.na(.)))$Frugivore_Species)), #phy
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_traits, f_traits)), all_vars(!is.na(.)))$Frugivore_Species)), #traits
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_phylo, p_latent, f_phylo, f_latent)), all_vars(!is.na(.)))$Frugivore_Species)),
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_phylo, p_traits, f_phylo, f_traits)), all_vars(!is.na(.)))$Frugivore_Species)),
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_latent, p_traits, f_traits, f_latent)), all_vars(!is.na(.)))$Frugivore_Species)),
+             
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_latent, p_traits, p_phylo, f_phylo, f_latent, f_traits)), all_vars(!is.na(.)))$Frugivore_Species))
+           ), 
+           nplants=c( ###Defining Frugivores
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_latent, f_latent)), all_vars(!is.na(.)))$Plant_Species)), #latent
+            length(unique(dplyr::filter_at(birds_temp, vars(c(p_phylo, f_phylo)), all_vars(!is.na(.)))$Plant_Species)), #phy
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_traits, f_traits)), all_vars(!is.na(.)))$Plant_Species)), #traits
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_phylo, p_latent, f_phylo, f_latent)), all_vars(!is.na(.)))$Plant_Species)),
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_phylo, p_traits, f_phylo, f_traits)), all_vars(!is.na(.)))$Plant_Species)),
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_latent, p_traits, f_traits, f_latent)), all_vars(!is.na(.)))$Plant_Species)),
+             
+             length(unique(dplyr::filter_at(birds_temp, vars(c(p_latent, p_traits, p_phylo, f_phylo, f_latent, f_traits)), all_vars(!is.na(.)))$Plant_Species))
+           ))
+```
+**Table S1:** Number of interactions, unique bird species, and unique plant species used in each model. Incomplete modeling cases were dropped from each model; the remaining number of complete cases was shown below. 
+```{r}
+kable(counTable, col.names = c("Model", "Number of Links", "Number of Bird species", "Number of Plant spp"))
+```
 
 ## Impact of Phylogenetic Imputation
 In our main text results, for the 46 plant species and 2 bird species which did not appear in the appropriate phylogenies but did have congenerics, we randomly assigned those species to be a polytomy within their parent genera. When these species are excluded from the analysis, our results are still qualitatively indistinguishable. Below are versions of the three main-text figures with those 48 species removed from the network. 
@@ -119,15 +225,18 @@ In our main text results, for the 46 plant species and 2 bird species which did 
 ### Sensitivity to Class Imbalances
 In order to deal with the high degree of sparceness in our network, we trim the training set to enforce class balancing. In the maintext, we present the results of a 3:1 ratio unobserved:observed links. Here, show the methods is relatively insensitive to this exact proportion by repeating our analysis with alternative training ratios of 1:1 and 1:10.
 
-![](AUC_Ratio.pdf)
-
-**Figure S5:** Supplemental caption for my figure
-
-
 ![](suitability_comp_unscaled.pdf)
 
-**Figure S6:** Supplemental caption for my other
+**Figure S5:** Scatterplot of relative suitability values of the same models trained under either a 1:3 ratio of present to absent interactions (y-axis) or a 1:1 ratio (x-axis); red dashed lines represent a 1:1 line. While the absolute value of suitability values tend to be reduced when the prevalence of true positives is reduced (most points fall below the 1:1 line), the relative rank of suitability values tends is very closely aligned (Spearman's $\rho = 0.964$ across all predictions).
 
+![](AUC_Ratio.pdf)
+
+**Figure S6:** Box plots of AUC values for model predictions on a 20% test set after being conditioned on training data with either 1:1, 1:3, or 1:10 ratios of presence to absence values. We see that while there is some variation in model performance according to training prevalence, the relative performance of each model is still qualitatively the same across the range of prevalence values. 
+
+
+![](Importance_by_Ratio.pdf)
+
+**Figure S7:** Variable importance between the same models trained on either a 1:1 ratio of present to absent interactions (y-axis) or a 1:3 ratio (x-axis). Dotted black lines represent a 1:1 line; points that fall on the line indicate that relative importance of that variable was unaffected by training prevalence. We see that the marjority of features fall very close to the 1:1 line, including the most important variables (top right of each inset plot).This indicates are models are realtively insensitive to training prevalence. 
 
 ```{r, eval=FALSE, echo=FALSE}
 split_output_1.1Ratio <- list()
@@ -216,9 +325,9 @@ for(i in 1:100){
 save(split_output_1.10Ratio, split_output_1.1Ratio, file="../Data.nosync/Results/Variable_BalancRatios.Rda")
 ```
 
-Extracting the performance metrics from our alternative balance ratio runs. 
-```{r, eval=FALSE, echo=FALSE}
 
+```{r, eval=FALSE, echo=FALSE}
+#Extracting the performance metrics from our alternative balance ratio runs. 
 load("../Data.nosync/Results/Variable_BalancRatios.Rda")
 performance1.10 <- NULL
 for(i in 1:100){
@@ -282,11 +391,10 @@ ggplot(data=ratioperf, aes(y=mrse, x=as.factor(model), fill=as.factor(ratio)))+
 #dev.off()
 ```
 
-So changing the balance ratio (as long as you're keeping it within a reasonable range), doesn't seem to have much an impact on AUC prediction on the test set. It changes the absolute values of MRSE, with the lowest value of MRSE occuring in the 1:3 balancing ration here (which we present in the main text), but qualitatively doesn't change relative ranking of the models Across all balancing ratios, we see the same relative position of models trained on different information. 
 
-Let's further compare the effects on variable importance below. 
 
 ```{r, eval=FALSE, echo=FALSE}
+#Let's further compare the effects on variable importance below. 
 split_output_1.1Ratio.rf <- list()
 for(i in 1:100){
     nas <- birds[gsub(" ", "_", birds$Frugivore_Species) %in%  Bird_trees[[round(i)]]$tip.label==FALSE,] %>% dplyr::select(., Frugivore_Species)  %>% unique() #Extract Bird taxa that don't occur in our tree
@@ -330,9 +438,8 @@ for(i in 1:100){
 save(split_output_1.1Ratio.rf, file="../Data.nosync/Results/Variable_BalancRatios_Rfob.Rda")
 ```
 
-Let's grab the variable importance summary for this update object
 ```{r, eval=FALSE, echo=FALSE}
-
+#Let's grab the variable importance summary for this update object
 temp <- NULL
 for(i in 1:100){
   # Phy
@@ -448,8 +555,10 @@ varimport_1.1RatioSummary$trait %<>% as.factor()
 varimporSummary$avg1.1 <- varimport_1.1RatioSummary$avg #Add 
 varimporSummary$sd1.1 <- varimport_1.1RatioSummary$sd
 ```
-Comparing the distribution of Relative Importance Values
+
 ```{r, eval=FALSE, echo=FALSE}
+#Comparing the distribution of Relative Importance Values
+
 varimporSummary2 <- varimporSummary
 varimporSummary2 <- varimporSummary2 %>% group_by(model) %>% mutate(relav_base=avg/max(avg), relav_1.1=avg1.1/max(avg1.1))
 
@@ -482,8 +591,9 @@ ggplot(data=., aes(x=relav_base, y=relav_1.1, color=as.factor(class)))+
 
 ```
 
-Comparing actual suitability difference
+
 ```{r, eval=FALSE, echo=FALSE}
+#Comparing actual suitability difference
 save(file="prereqs.rda", birds, Bird_trees, woodedWalk)
 suitout <- NULL
 for(ratioval in c(1, 3, 10)){
@@ -582,8 +692,12 @@ ggplot(data=widesuit, aes(x=1-S_mean_1, y=1-S_mean_3, color=model))+
   xlab("Suitability under 1:1")+
   ylab("Suitability under 1:3")+
   geom_abline (slope=1, linetype = "dashed", color="Red")+
-  facet_wrap(~model)
+  facet_wrap(~model, nrow=2)+
+  theme(legend.position = c(0.9,0.2))+
+  guides(color=guide_legend(title="Model"))
 #dev.off()
+
+cor.test(x=widesuit$S_mean_1, y=widesuit$S_mean_3, method="spearman")
 ```
 
 
