@@ -19,6 +19,7 @@ library("phytools")
 library(picante)
 library(magrittr)
 library(kableExtra)
+library(pROC)
 ```
 
 ```{r, echo=FALSE}
@@ -97,7 +98,7 @@ hist(table(birds$Plant_Species), xlab="Degree", ylab="Observed Frequency", main=
 ```
 
 
-**Figure S2:** Observed degree distribution of avian frugivore species included in our analyses. X-axis represents node degree, or number of unique partners. Degree on average tended to be lower for plants than frugivores; plant node degree ranged from 1 (128 species) to 80 unique frugivorous interactions recorded for \emph{Myrsine coriacea}; median plant degree was `r median(table(dat$Frugivore_Species))`.
+**Figure S2:** Observed degree distribution of plant species included in our analyses. X-axis represents node degree, or number of unique partners. Degree on average tended to be lower for plants than frugivores; plant node degree ranged from 1 (128 species) to 80 unique frugivorous interactions recorded for \emph{Myrsine coriacea}; median plant degree was `r median(table(dat$Frugivore_Species))`.
 
 ```{r, echo=FALSE}
 Bird_trees <- ape::read.nexus("../Data.nosync/DataSources/VertLife_FrugBird/query2/output_larger.nex")
@@ -206,13 +207,13 @@ kable(counTable, col.names = c("Model", "Number of Links", "Number of Bird speci
 ## Impact of Phylogenetic Imputation
 In our main text results, for the 46 plant species and 2 bird species which did not appear in the appropriate phylogenies but did have congenerics, we randomly assigned those species to be a polytomy within their parent genera. When these species are excluded from the analysis, our results are still qualitatively indistinguishable. Below are versions of the three main-text figures with those 48 species removed from the network. 
 
-![]("fig1_nopoly.png")
+![]("fig1_nopoly_col2.pdf")
 
 **Figure S3:** Summary performance metrics of all 7 models *when species without full phylogenetic information are excluded*, as measured by area under the receiver operating characteristic curve (AUC) and root mean squared error (RMSE); highest performing models for each metric are outlined in black. Mean metric values are presented from 100 replicates of each model structure alongside standard deviation. As in the main text, model discriminatory power between links and non-links is maximized by including latent structural features, with the inclusion of trait, phylogenetic information, or both actually slightly decreasing discriminatory power. However, inclusion of trait and phylogenetic information, while not improving AUC, does increase overall model accuracy as measured by mean root squared error.
 
 
 
-![]("fig2_nopoly.pdf")
+![]("fig2_nopoly_col2.pdf")
 
 **Figure S4:** Variable importance across all models as measure by Gini importance score *when species without full phylogenetic information are excluded*; color scheme is consistent with figure S3. As in the maintext,latent traits were consistently the most important variables for prediction. These were followed by continuous frugivore traits (body mass, gape size), and frugivore phylogenetic axes. Plant phylogenies and continuous trait information were generally less important for prediction than frugivore traits. Categorical plant traits (Lipid content, fruit color, growth form) were the least important variables for prediction.
 
@@ -672,6 +673,7 @@ for(ratioval in c(1, 3, 10)){
     print(paste(i, "complete of 100", sep=" "))
   }
 }
+save(suitout, file="AlternativeRatio_Suitabilities.rda")
 ```
 
 
@@ -704,6 +706,47 @@ cor.test(x=widesuit$S_mean_1, y=widesuit$S_mean_3, method="spearman")
 
 ```{r, eval=FALSE, echo=FALSE}
 Svals <- dplyr::group_by(suitout, Plant_Species, Frugivore_Species, model) %>% dplyr::summarise(., avgsuit=1-mean(S, na.rm=T), n=n()) #Change to the right scale (0 for unlikely link). 
+```
+
+## In Defense of Latent Traits
+
+Let's use a simple neutral model to show that latent traits can be useful for filling in missing links. 
+
+Start by simulated a "true" networks, where attatchment is a neutral process based on species abundance (drawn from a lognormal distribution)
+
+Set up our random network
+```{r}
+set.seed(1)
+
+pAbnds <- rlnorm(100)
+fAbnds <- rlnorm(50)
+
+# Generate all combinations
+interactions <- expand.grid(FrugivoreID = 1:50, PlantID = 1:100) %>% #Make blank pairwise combos
+  left_join(., data.frame(FrugivoreID=1:50, FrugAbund=rlnorm(50)), by="FrugivoreID") %>% #Generate random frugivore abundances from lognormal
+  left_join(., data.frame(PlantID=1:100, PlantAbund=rlnorm(100)), by="PlantID") %>% #Generate plant abundances
+  dplyr::mutate(., AbundProd=PlantAbund*FrugAbund)
+
+interactions$real <- 0
+interactions$real[sample(x=1:nrow(interactions), size=500,replace=F, prob=interactions$AbundProd)] <- 1 #Create 500 links, being more likely based on higher abundance
+
+ggplot(interactions, aes(x = factor(real), y = AbundProd)) +
+  geom_boxplot() +
+  labs(
+    x = "Interaction (0 = Absent, 1 = Present)",
+    y = "Product of Interactor Abundances"
+  ) +
+  theme_minimal()
+```
+
+Subsample the network
+
+```{r}
+interactions$obs <- NA
+
+interactions
+sample(x=1:500, size=400, replace=FALSE)
+
 ```
 
 
