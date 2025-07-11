@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.3.15)  11 JUL 2024 15:03
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.7.11)  21 APR 2025 18:22
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -646,42 +646,42 @@ Package gensymb Warning: Not defining \micro.
 
 
 Underfull \hbox (badness 1675) in paragraph at lines 46--49
-\T1/ppl/m/n/9 im-per-fect rep-re-sen-ta-tion of the ``true'' un-der-ly-ing
+\T1/ppl/m/n/9 im-per-fec-t rep-re-sen-ta-tion of the ``true'' un-der-ly-ing
  []
 
 
 Underfull \hbox (badness 1502) in paragraph at lines 46--49
-\T1/ppl/m/n/9 com-mu-nity. Link pre-dic-tion meth-ods al-low us to
+\T1/ppl/m/n/9 com-mu-ni-ty. Link pre-dic-tion meth-od-s al-low us to
  []
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 46--49
-\T1/ppl/m/n/9 sam-pling of pre-dicted links, as well as of-fer
+\T1/ppl/m/n/9 sam-pling of pre-dict-ed links, as well as of-fer
  []
 
 
 Underfull \hbox (badness 1552) in paragraph at lines 46--49
-\T1/ppl/m/n/9 in-sight into po-ten-tial in-ter-ac-tions that may oc-cur
+\T1/ppl/m/n/9 in-sight in-to po-ten-tial in-ter-ac-tion-s that may oc-cur
  []
 
 
 Underfull \hbox (badness 1460) in paragraph at lines 46--49
-\T1/ppl/m/n/9 struc-ture was the most im-por-tant de-ter-mi-nant of
+\T1/ppl/m/n/9 struc-ture was the most im-por-tan-t de-ter-mi-nan-t of
  []
 
 
 Underfull \hbox (badness 1776) in paragraph at lines 46--49
-\T1/ppl/m/n/9 trait or phy-lo-ge-netic in-for-ma-tion along-side la-tent
+\T1/ppl/m/n/9 trait or phy-lo-ge-net-ic in-for-ma-tion a-long-side la-ten-t
  []
 
 
 Underfull \hbox (badness 1577) in paragraph at lines 46--49
-\T1/ppl/m/n/9 Our re-sults high-light the po-ten-tial im-por-tance of
+\T1/ppl/m/n/9 Our re-sult-s high-light the po-ten-tial im-por-tance of
  []
 
 
 Underfull \hbox (badness 2837) in paragraph at lines 46--49
-\T1/ppl/m/n/9 be-tween pre-dic-tion per-for-mance met-rics and the
+\T1/ppl/m/n/9 be-tween pre-dic-tion per-for-mance met-ric-s and the
  []
 
 LaTeX Font Info:    Trying to load font information for U+msa on input line 58.
@@ -704,7 +704,7 @@ File: ueuex.fd 2013/01/14 v3.01 Euler extra symbols
 ! Too many }'s.
 \endfmtext ->\par \egroup 
                           
-l.76 \rsbreak
+l.75 \rsbreak
              
 You've closed more groups than you opened.
 Such booboos are generally harmless, so keep going.
@@ -716,7 +716,7 @@ See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.76 \rsbreak
+l.75 \rsbreak
              
 Your command was ignored.
 Type  I <command> <return>  to replace it with another command,
@@ -725,7 +725,7 @@ or  <return>  to continue without it.
 ! Extra \endgroup.
 <recently read> \endgroup 
                           
-l.76 \rsbreak
+l.75 \rsbreak
              
 Things are pretty mixed up, but I think the worst is over.
 
@@ -736,7 +736,7 @@ See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.76 \rsbreak
+l.75 \rsbreak
              
 I could not locate the file with any of these extensions:
 .pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPEG,.JBIG2,.JB2,.eps
@@ -744,17 +744,17 @@ Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 11.47508pt on input line 76.
+(Font)              scaled to size 11.47508pt on input line 75.
 
-Package xcolor Warning: Incompatible color definition on input line 76.
+Package xcolor Warning: Incompatible color definition on input line 75.
 
 
-Overfull \hbox (16.32098pt too wide) in paragraph at lines 76--76
+Overfull \hbox (16.32098pt too wide) in paragraph at lines 75--75
 [][]\T1/phv/m/n/11 royalsocietypublishing.org/journal/rspb[] 
  []
 
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 15.30011pt on input line 76.
+(Font)              scaled to size 15.30011pt on input line 75.
 
 ! LaTeX Error: File `RSTA_OpenAccesslogo_RGB' not found.
 
@@ -762,7 +762,7 @@ See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.76 \rsbreak
+l.75 \rsbreak
              
 I could not locate the file with any of these extensions:
 .pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPEG,.JBIG2,.JB2,.eps
@@ -776,7 +776,7 @@ See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.76 \rsbreak
+l.75 \rsbreak
              
 I could not locate the file with any of these extensions:
 .pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPEG,.JBIG2,.JB2,.eps
@@ -784,37 +784,37 @@ Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 8.50006pt on input line 76.
+(Font)              scaled to size 8.50006pt on input line 75.
 LaTeX Font Info:    Font shape `T1/phv/b/n' will be
-(Font)              scaled to size 8.50006pt on input line 76.
+(Font)              scaled to size 8.50006pt on input line 75.
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 17.00012pt on input line 76.
+(Font)              scaled to size 17.00012pt on input line 75.
 
-Package xcolor Warning: Incompatible color definition on input line 76.
+Package xcolor Warning: Incompatible color definition on input line 75.
 
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 11.90009pt on input line 76.
+(Font)              scaled to size 11.90009pt on input line 75.
 
-Package xcolor Warning: Incompatible color definition on input line 76.
+Package xcolor Warning: Incompatible color definition on input line 75.
 
-LaTeX Font Info:    Calculating math sizes for size <14> on input line 76.
-LaTeX Font Info:    Calculating math sizes for size <11> on input line 76.
+LaTeX Font Info:    Calculating math sizes for size <14> on input line 75.
+LaTeX Font Info:    Calculating math sizes for size <11> on input line 75.
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <5.5> not available
-(Font)              size <5> substituted on input line 76.
+(Font)              size <5> substituted on input line 75.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <5.5> not available
-(Font)              size <5> substituted on input line 76.
+(Font)              size <5> substituted on input line 75.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <5.5> not available
-(Font)              size <5> substituted on input line 76.
+(Font)              size <5> substituted on input line 75.
 
 ! Undefined control sequence.
 \@maketitle ...avevmode \vphantom {$^1$}\@address 
                                                   \par }} \fi \ifvoid \absbo...
-l.76 \rsbreak
+l.75 \rsbreak
              
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -823,12 +823,12 @@ spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
 
-Overfull \hbox (256.35973pt too wide) in paragraph at lines 76--76
+Overfull \hbox (256.35973pt too wide) in paragraph at lines 75--75
 [] 
  []
 
 
-Package xcolor Warning: Incompatible color definition on input line 76.
+Package xcolor Warning: Incompatible color definition on input line 75.
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -845,7 +845,7 @@ See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.76 \rsbreak
+l.75 \rsbreak
              
 I could not locate the file with any of these extensions:
 .pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPEG,.JBIG2,.JB2,.eps
@@ -853,46 +853,46 @@ Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 6.37505pt on input line 76.
-LaTeX Font Info:    Calculating math sizes for size <7.5> on input line 76.
+(Font)              scaled to size 6.37505pt on input line 75.
+LaTeX Font Info:    Calculating math sizes for size <7.5> on input line 75.
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <7.5> not available
-(Font)              size <7> substituted on input line 76.
+(Font)              size <7> substituted on input line 75.
 
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <3.75> not available
-(Font)              size <5> substituted on input line 76.
+(Font)              size <5> substituted on input line 75.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <7.5> not available
-(Font)              size <7> substituted on input line 76.
+(Font)              size <7> substituted on input line 75.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <3.75> not available
-(Font)              size <5> substituted on input line 76.
+(Font)              size <5> substituted on input line 75.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <7.5> not available
-(Font)              size <7> substituted on input line 76.
+(Font)              size <7> substituted on input line 75.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <3.75> not available
-(Font)              size <5> substituted on input line 76.
+(Font)              size <5> substituted on input line 75.
 
 LaTeX Font Info:    Trying to load font information for TS1+phv on input line 7
-6.
+5.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1phv.fd
 File: ts1phv.fd 2020/03/25 scalable font definitions for TS1/phv.
 )
 LaTeX Font Info:    Font shape `TS1/phv/m/n' will be
-(Font)              scaled to size 6.37505pt on input line 76.
+(Font)              scaled to size 6.37505pt on input line 75.
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 4.4625pt on input line 76.
+(Font)              scaled to size 4.4625pt on input line 75.
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 3.18752pt on input line 76.
+(Font)              scaled to size 3.18752pt on input line 75.
 
 
-Package xcolor Warning: Incompatible color definition on input line 76.
+Package xcolor Warning: Incompatible color definition on input line 75.
 
 
 Underfull \hbox (badness 10000) has occurred while \output is active
@@ -906,33 +906,33 @@ Underfull \hbox (badness 10000) has occurred while \output is active
 Non-PDF special ignored!
 <special> papersize=210mm,280mm
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}]
-Underfull \hbox (badness 10000) in paragraph at lines 79--80
+Underfull \hbox (badness 10000) in paragraph at lines 78--79
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 82--83
+Underfull \hbox (badness 10000) in paragraph at lines 81--82
 
  []
 
-LaTeX Font Info:    Trying to load font information for T1+pcr on input line 85
+LaTeX Font Info:    Trying to load font information for T1+pcr on input line 84
 .
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/t1pcr.fd
 File: t1pcr.fd 2001/06/04 font definitions for T1/pcr.
 )
-Underfull \hbox (badness 10000) in paragraph at lines 85--86
+Underfull \hbox (badness 10000) in paragraph at lines 84--85
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 87--88
+Underfull \hbox (badness 10000) in paragraph at lines 86--87
 
  []
 
 LaTeX Font Info:    Font shape `T1/phv/b/n' will be
-(Font)              scaled to size 7.65005pt on input line 108.
+(Font)              scaled to size 7.65005pt on input line 107.
 
-Package xcolor Warning: Incompatible color definition on input line 108.
+Package xcolor Warning: Incompatible color definition on input line 107.
 
 
 Overfull \vbox (21.4162pt too high) has occurred while \output is active []
@@ -940,131 +940,131 @@ Overfull \vbox (21.4162pt too high) has occurred while \output is active []
 
 [2]
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 13.6001pt on input line 110.
+(Font)              scaled to size 13.6001pt on input line 109.
 
 
-Package xcolor Warning: Incompatible color definition on input line 110.
+Package xcolor Warning: Incompatible color definition on input line 109.
 
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 4.25003pt on input line 110.
+(Font)              scaled to size 4.25003pt on input line 109.
 
 Package natbib Warning: Citation `guimaraes2020structure' on page 3 undefined o
-n input line 113.
+n input line 112.
 
 
 Package natbib Warning: Citation `saravia2022ecological' on page 3 undefined on
- input line 113.
+ input line 112.
 
 
 Package natbib Warning: Citation `Young21' on page 3 undefined on input line 11
-3.
+2.
 
 
 Package natbib Warning: Citation `canard2014empirical' on page 3 undefined on i
-nput line 113.
+nput line 112.
 
 
 Package natbib Warning: Citation `cirtwill2019quantitative' on page 3 undefined
- on input line 113.
+ on input line 112.
 
 
 Package natbib Warning: Citation `olesen2011missing' on page 3 undefined on inp
-ut line 113.
+ut line 112.
 
 
 Package natbib Warning: Citation `bluthgen2008' on page 3 undefined on input li
-ne 113.
+ne 112.
 
 
 Package natbib Warning: Citation `Young21' on page 3 undefined on input line 11
-3.
+2.
 
 
 Package natbib Warning: Citation `olesen2011' on page 3 undefined on input line
- 113.
+ 112.
 
 
 Package natbib Warning: Citation `quintero2022methodological' on page 3 undefin
-ed on input line 117.
+ed on input line 116.
 
 
 Package natbib Warning: Citation `putman2021power' on page 3 undefined on input
- line 117.
+ line 116.
 
 
 Package natbib Warning: Citation `minoarivelo2016invading' on page 3 undefined 
-on input line 117.
+on input line 116.
 
 
 Package natbib Warning: Citation `ramos2018fruit' on page 3 undefined on input 
-line 120.
+line 119.
 
 
 Package natbib Warning: Citation `rafferty2013' on page 3 undefined on input li
-ne 120.
+ne 119.
 
 
 Package natbib Warning: Citation `eriksson2016evolution' on page 3 undefined on
- input line 120.
+ input line 119.
 
 
 Package natbib Warning: Citation `fricke2020accelerating' on page 3 undefined o
-n input line 120.
+n input line 119.
 
 
 Package natbib Warning: Citation `menke2012plant' on page 3 undefined on input 
-line 120.
+line 119.
 
 
 Package natbib Warning: Citation `laurindo2020drivers' on page 3 undefined on i
-nput line 120.
+nput line 119.
 
 
 Package natbib Warning: Citation `carreira2020question' on page 3 undefined on 
-input line 120.
+input line 119.
 
 
 Package natbib Warning: Citation `dallas2017predicting' on page 3 undefined on 
-input line 120.
+input line 119.
 
 
 Package natbib Warning: Citation `bender2018morphological' on page 3 undefined 
-on input line 124.
+on input line 123.
 
 
 Package natbib Warning: Citation `gonzalez2015relative' on page 3 undefined on 
-input line 124.
+input line 123.
 
 
 Package natbib Warning: Citation `moran2010can' on page 3 undefined on input li
-ne 124.
+ne 123.
 
 
 Package natbib Warning: Citation `pichler2020' on page 3 undefined on input lin
-e 124.
+e 123.
 
 
 Package natbib Warning: Citation `rafferty2013' on page 3 undefined on input li
-ne 127.
+ne 126.
 
 
 Package natbib Warning: Citation `maglianesi2024phylogenetic' on page 3 undefin
-ed on input line 127.
+ed on input line 126.
 
 
 Package natbib Warning: Citation `jordano1987patterns' on page 3 undefined on i
-nput line 127.
+nput line 126.
 
 
 Package natbib Warning: Citation `wheelwright1982seed' on page 3 undefined on i
-nput line 127.
+nput line 126.
 
 
 Package natbib Warning: Citation `Braga21' on page 3 undefined on input line 12
-7.
+6.
 
 
-Package xcolor Warning: Incompatible color definition on input line 128.
+Package xcolor Warning: Incompatible color definition on input line 127.
 
 
 Overfull \vbox (21.51176pt too high) has occurred while \output is active []
@@ -1075,48 +1075,48 @@ Overfull \vbox (21.51176pt too high) has occurred while \output is active []
 ]
 
 Package natbib Warning: Citation `poisot2021imputing' on page 4 undefined on in
-put line 132.
+put line 131.
 
 
 Package natbib Warning: Citation `strydom2022food' on page 4 undefined on input
- line 132.
+ line 131.
 
 
 Package natbib Warning: Citation `seo2018predicting' on page 4 undefined on inp
-ut line 132.
+ut line 131.
 
 
 Package natbib Warning: Citation `banville2023constrains' on page 4 undefined o
-n input line 132.
+n input line 131.
 
 
 Package natbib Warning: Citation `poisot2021imputing' on page 4 undefined on in
-put line 132.
+put line 131.
 
 
 Package natbib Warning: Citation `poisot2023network' on page 4 undefined on inp
-ut line 132.
+ut line 131.
 
 
 Package natbib Warning: Citation `strydom2021roadmap' on page 4 undefined on in
-put line 136.
+put line 135.
 
 
-Package xcolor Warning: Incompatible color definition on input line 138.
+Package xcolor Warning: Incompatible color definition on input line 137.
 
 
 Package natbib Warning: Citation `bello2017' on page 4 undefined on input line 
-141.
+140.
 
 
 Package natbib Warning: Citation `kembel2010picante' on page 4 undefined on inp
-ut line 141.
+ut line 140.
 
 
-LaTeX Warning: Reference `supplement' on page 4 undefined on input line 141.
+LaTeX Warning: Reference `supplement' on page 4 undefined on input line 140.
 
 
-Package xcolor Warning: Incompatible color definition on input line 145.
+Package xcolor Warning: Incompatible color definition on input line 144.
 
 
 Overfull \vbox (21.4162pt too high) has occurred while \output is active []
@@ -1125,52 +1125,52 @@ Overfull \vbox (21.4162pt too high) has occurred while \output is active []
 [4]
 
 Package natbib Warning: Citation `maitner2018bien' on page 5 undefined on input
- line 150.
+ line 149.
 
 
 Package natbib Warning: Citation `jetz2012' on page 5 undefined on input line 1
-50.
+49.
 
 
-Package natbib Warning: Citation `RCore' on page 5 undefined on input line 153.
+Package natbib Warning: Citation `RCore' on page 5 undefined on input line 152.
 
 
 
 Package natbib Warning: Citation `randomForest' on page 5 undefined on input li
-ne 156.
+ne 155.
 
 
 Package natbib Warning: Citation `vazquez2009uniting' on page 5 undefined on in
-put line 156.
+put line 155.
 
 
 Package natbib Warning: Citation `norberg2019comprehensive' on page 5 undefined
- on input line 156.
+ on input line 155.
 
 
 Package natbib Warning: Citation `youden1950index' on page 5 undefined on input
- line 156.
+ line 155.
 
 
 Package natbib Warning: Citation `randomForest' on page 5 undefined on input li
-ne 160.
+ne 159.
 
 
 Package natbib Warning: Citation `khalilia2011predicting' on page 5 undefined o
-n input line 160.
+n input line 159.
 
 
 Package natbib Warning: Citation `calle2011stability' on page 5 undefined on in
-put line 160.
+put line 159.
 
 
-Package xcolor Warning: Incompatible color definition on input line 167.
+Package xcolor Warning: Incompatible color definition on input line 166.
 
 
-Package xcolor Warning: Incompatible color definition on input line 169.
+Package xcolor Warning: Incompatible color definition on input line 168.
 
 
-Package xcolor Warning: Incompatible color definition on input line 169.
+Package xcolor Warning: Incompatible color definition on input line 168.
 
 
 Overfull \vbox (21.51176pt too high) has occurred while \output is active []
@@ -1178,16 +1178,16 @@ Overfull \vbox (21.51176pt too high) has occurred while \output is active []
 
 [5]
 
-Package xcolor Warning: Incompatible color definition on input line 173.
+Package xcolor Warning: Incompatible color definition on input line 172.
 
 
-Package xcolor Warning: Incompatible color definition on input line 181.
+Package xcolor Warning: Incompatible color definition on input line 180.
 
 
-Package xcolor Warning: Incompatible color definition on input line 194.
+Package xcolor Warning: Incompatible color definition on input line 193.
 
 
-Package xcolor Warning: Incompatible color definition on input line 197.
+Package xcolor Warning: Incompatible color definition on input line 196.
 
 
 Overfull \vbox (21.51176pt too high) has occurred while \output is active []
@@ -1196,62 +1196,62 @@ Overfull \vbox (21.51176pt too high) has occurred while \output is active []
 [6]
 
 Package natbib Warning: Citation `richardson2000plant' on page 7 undefined on i
-nput line 199.
+nput line 198.
 
 
 Package natbib Warning: Citation `laurindo2020drivers' on page 7 undefined on i
-nput line 199.
+nput line 198.
 
 
 Package natbib Warning: Citation `hand2009measuring' on page 7 undefined on inp
-ut line 202.
+ut line 201.
 
 
-LaTeX Warning: Reference `add supplement' on page 7 undefined on input line 205
+LaTeX Warning: Reference `add supplement' on page 7 undefined on input line 204
 .
 
 
 Package natbib Warning: Citation `banville2023constrains' on page 7 undefined o
-n input line 207.
+n input line 206.
 
 
 Package natbib Warning: Citation `poisot2021imputing' on page 7 undefined on in
-put line 207.
+put line 206.
 
 
 Package natbib Warning: Citation `poisot2023network' on page 7 undefined on inp
-ut line 207.
+ut line 206.
 
 
 Package natbib Warning: Citation `tylianakis2017ecological' on page 7 undefined
- on input line 210.
+ on input line 209.
 
 
 Package natbib Warning: Citation `memmott2007global' on page 7 undefined on inp
-ut line 210.
+ut line 209.
 
 
 Package natbib Warning: Citation `teixido2022anthropogenic' on page 7 undefined
- on input line 210.
+ on input line 209.
 
 
 Package natbib Warning: Citation `lever2014sudden' on page 7 undefined on input
- line 210.
+ line 209.
 
 
 Package natbib Warning: Citation `bascompte2022resilience' on page 7 undefined 
-on input line 210.
+on input line 209.
 
 
 Package natbib Warning: Citation `fricke2020accelerating' on page 7 undefined o
-n input line 210.
+n input line 209.
 
 
 Package natbib Warning: Citation `traveset2014mutualistic' on page 7 undefined 
-on input line 210.
+on input line 209.
 
 
-Package xcolor Warning: Incompatible color definition on input line 211.
+Package xcolor Warning: Incompatible color definition on input line 210.
 
 
 Overfull \vbox (21.4162pt too high) has occurred while \output is active []
@@ -1259,7 +1259,7 @@ Overfull \vbox (21.4162pt too high) has occurred while \output is active []
 
 [7]
 
-Package xcolor Warning: Incompatible color definition on input line 216.
+Package xcolor Warning: Incompatible color definition on input line 215.
 
 
 Overfull \vbox (21.51176pt too high) has occurred while \output is active []
@@ -1268,19 +1268,19 @@ Overfull \vbox (21.51176pt too high) has occurred while \output is active []
 [8]
 No file Manuscript.bbl.
 
-Package xcolor Warning: Incompatible color definition on input line 222.
+Package xcolor Warning: Incompatible color definition on input line 221.
 
 LaTeX Font Info:    Font shape `T1/phv/b/n' will be
-(Font)              scaled to size 7.22505pt on input line 227.
+(Font)              scaled to size 7.22505pt on input line 226.
 LaTeX Font Info:    Font shape `T1/phv/m/n' will be
-(Font)              scaled to size 7.22505pt on input line 227.
+(Font)              scaled to size 7.22505pt on input line 226.
 
-Underfull \hbox (badness 10000) detected at line 227
+Underfull \hbox (badness 10000) detected at line 226
 []
  []
 
 
-Package xcolor Warning: Incompatible color definition on input line 247.
+Package xcolor Warning: Incompatible color definition on input line 246.
 
 
 Overfull \vbox (21.51176pt too high) has occurred while \output is active []
@@ -1292,35 +1292,35 @@ Overfull \vbox (21.51176pt too high) has occurred while \output is active []
 ]
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 250.
+               Default added (so using `tbp') on input line 249.
 
-LaTeX Font Info:    Calculating math sizes for size <8.5> on input line 251.
+LaTeX Font Info:    Calculating math sizes for size <8.5> on input line 250.
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <8.5> not available
-(Font)              size <8> substituted on input line 251.
+(Font)              size <8> substituted on input line 250.
 
 
 LaTeX Font Warning: Font shape `OT1/cmr/m/n' in size <4.25> not available
-(Font)              size <5> substituted on input line 251.
+(Font)              size <5> substituted on input line 250.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <8.5> not available
-(Font)              size <8> substituted on input line 251.
+(Font)              size <8> substituted on input line 250.
 
 
 LaTeX Font Warning: Font shape `OML/cmm/m/it' in size <4.25> not available
-(Font)              size <5> substituted on input line 251.
+(Font)              size <5> substituted on input line 250.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <8.5> not available
-(Font)              size <8> substituted on input line 251.
+(Font)              size <8> substituted on input line 250.
 
 
 LaTeX Font Warning: Font shape `OMS/cmsy/m/n' in size <4.25> not available
-(Font)              size <5> substituted on input line 251.
+(Font)              size <5> substituted on input line 250.
 
 
-Package xcolor Warning: Incompatible color definition on input line 270.
+Package xcolor Warning: Incompatible color definition on input line 269.
 
 
 Overfull \vbox (21.51176pt too high) has occurred while \output is active []
@@ -1328,16 +1328,16 @@ Overfull \vbox (21.51176pt too high) has occurred while \output is active []
 
 [10]
 
-Package xcolor Warning: Incompatible color definition on input line 275.
+Package xcolor Warning: Incompatible color definition on input line 274.
 
 <../Figs/ReplicatePerformance.png, id=98, 337.77191pt x 227.6505pt>
 File: ../Figs/ReplicatePerformance.png Graphic file (type png)
 <use ../Figs/ReplicatePerformance.png>
 Package pdftex.def Info: ../Figs/ReplicatePerformance.png  used on input line 2
-78.
+77.
 (pdftex.def)             Requested size: 469.75539pt x 316.62083pt.
 
-Package xcolor Warning: Incompatible color definition on input line 284.
+Package xcolor Warning: Incompatible color definition on input line 283.
 
 
 Overfull \vbox (21.4162pt too high) has occurred while \output is active []
@@ -1351,11 +1351,11 @@ Overfull \vbox (21.4162pt too high) has occurred while \output is active []
 File: ../Figs/Short_Varimportance.png Graphic file (type png)
 <use ../Figs/Short_Varimportance.png>
 Package pdftex.def Info: ../Figs/Short_Varimportance.png  used on input line 28
-8.
+7.
 (pdftex.def)             Requested size: 469.75539pt x 225.06296pt.
 
 
-Package xcolor Warning: Incompatible color definition on input line 295.
+Package xcolor Warning: Incompatible color definition on input line 294.
 
 
 Overfull \vbox (21.4162pt too high) has occurred while \output is active []
@@ -1366,11 +1366,11 @@ Overfull \vbox (21.4162pt too high) has occurred while \output is active []
 File: ../Figs/SpearmanCorplot_nolab.pdf Graphic file (type pdf)
 <use ../Figs/SpearmanCorplot_nolab.pdf>
 Package pdftex.def Info: ../Figs/SpearmanCorplot_nolab.pdf  used on input line 
-300.
+299.
 (pdftex.def)             Requested size: 469.75539pt x 228.09946pt.
  Setting LastPage
 
-Package xcolor Warning: Incompatible color definition on input line 323.
+Package xcolor Warning: Incompatible color definition on input line 322.
 
 
 Overfull \vbox (21.51176pt too high) has occurred while \output is active []
@@ -1392,12 +1392,12 @@ Package rerunfilecheck Info: File `Manuscript.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 13489 strings out of 480129
- 206649 string characters out of 5893409
- 517705 words of memory out of 5000000
- 31108 multiletter control sequences out of 15000+600000
+ 13489 strings out of 480261
+ 206649 string characters out of 5896481
+ 518162 words of memory out of 5000000
+ 31084 multiletter control sequences out of 15000+600000
  537876 words of font info for 147 fonts, out of 8000000 for 9000
- 91 hyphenation exceptions out of 8191
+ 24 hyphenation exceptions out of 8191
  75i,14n,77p,2303b,414s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf
