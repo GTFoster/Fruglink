@@ -20,6 +20,9 @@ library(picante)
 library(magrittr)
 library(kableExtra)
 library(pROC)
+library(magrittr)
+library(tictoc)
+
 ```
 
 ```{r, echo=FALSE}
@@ -714,22 +717,81 @@ Let's use a simple neutral model to show that latent traits can be useful for fi
 
 Start by simulated a "true" networks, where attatchment is a neutral process based on species abundance (drawn from a lognormal distribution)
 
-Set up our random network
 ```{r}
-set.seed(1)
+#n_plants <- 100; n_frugivores=50; n_links = 500; n_observed = 300; backgroundratio=3 #for debugging
+run_latent_trait_simulation <- function(n_plants = 100, n_frugivores = 50, 
+                                        n_links = 500, n_observed = 300, backgroundratio=3) {
 
-pAbnds <- rlnorm(100)
-fAbnds <- rlnorm(50)
+  # Generate all combinations
+  interactions <- expand.grid(FrugivoreID = 1:n_frugivores, 
+                              PlantID = 1:n_plants) %>% 
+    left_join(data.frame(FrugivoreID = 1:n_frugivores, 
+                         FrugAbund = rlnorm(n_frugivores)), by = "FrugivoreID") %>%
+    left_join(data.frame(PlantID = 1:n_plants, 
+                         PlantAbund = rlnorm(n_plants)), by = "PlantID") %>%
+    mutate(AbundProd = PlantAbund * FrugAbund) #Make a column of abundance products
 
-# Generate all combinations
-interactions <- expand.grid(FrugivoreID = 1:50, PlantID = 1:100) %>% #Make blank pairwise combos
-  left_join(., data.frame(FrugivoreID=1:50, FrugAbund=rlnorm(50)), by="FrugivoreID") %>% #Generate random frugivore abundances from lognormal
-  left_join(., data.frame(PlantID=1:100, PlantAbund=rlnorm(100)), by="PlantID") %>% #Generate plant abundances
-  dplyr::mutate(., AbundProd=PlantAbund*FrugAbund)
+  # Assign "real" interactions using abundance-weighted probabilities 
+  interactions$real <- 0
+  interactions$real[sample(1:nrow(interactions), size = n_links, replace = FALSE, prob = interactions$AbundProd)] <- 1
 
-interactions$real <- 0
-interactions$real[sample(x=1:nrow(interactions), size=500,replace=F, prob=interactions$AbundProd)] <- 1 #Create 500 links, being more likely based on higher abundance
+  # Degrade the network by hiding some links
+  interactions$obs <- NA
+  interactions$obs[sample(which(interactions$real == 1), size = n_observed, replace = FALSE)] <- 1 #Correctly get n_observed
+  interactions$obs[is.na(interactions$obs)] <- 0
 
+  # Rename species
+  interactions$FrugivoreID <- paste0("F", interactions$FrugivoreID)
+  interactions$PlantID <- paste0("P", interactions$PlantID)
+
+  # Perform SVD latent feature reduction
+  mat_assym <- xtabs(obs ~ FrugivoreID + PlantID, data = interactions) #Make adj matrix
+  decomp <- svd(mat_assym)
+  u <- decomp$u
+  v <- data.frame(decomp$v)
+
+  # Trait tables
+  plantsSVD <- data.frame(PlantID = colnames(mat_assym), 
+                          Psvd1 = v[, 1], Psvd2 = v[, 2], Psvd3 = v[, 3])
+  frugSVD <- data.frame(FrugivoreID = rownames(mat_assym), 
+                        Fsvd1 = u[, 1], Fsvd2 = u[, 2], Fsvd3 = u[, 3])
+
+  # Merge traits
+  interactions <- interactions %>%
+    left_join(plantsSVD, by = "PlantID") %>%
+    left_join(frugSVD, by = "FrugivoreID")
+
+  # Create test/training split
+  test <- filter(interactions, real == 1 & obs == 0) #Test is all unoberved real
+  background <- filter(interactions, real == 0)
+  test <- bind_rows(test, background[sample(nrow(background), backgroundratio * nrow(test)), ]) #Add in some other missed 0's as a background ratio
+  
+  test$combo <- paste(test$FrugivoreID, test$PlantID, sep = "-") #create unifying column
+  interactions$combo <- paste(interactions$FrugivoreID, interactions$PlantID, sep = "-")
+
+  train <- filter(interactions, !combo %in% test$combo) #training is everything left (should this be re-evaluated?)
+
+  # Rename for woodedWalk
+  train <- rename(train, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+  test  <- rename(test, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+
+  # Fit model based on latent traits
+  out <- woodedWalk_NoSplit(train, 
+                            FrugTraits = c("Fsvd1", "Fsvd2", "Fsvd3"), 
+                            PlantTraits = c("Psvd1", "Psvd2", "Psvd3"), class_balancing = TRUE)
+
+  test$S <- stats::predict(out, newdata = test, type = "prob")[, 2] #Grab Svals
+  # Evaluate performance
+  rOC <- roc(data = test, response = real, predictor = S)
+  AUC <- rOC$auc
+  return(AUC)
+}
+```
+
+
+Some plotting investigation of intermediate object
+
+```{r, eval=FALSE}
 ggplot(interactions, aes(x = factor(real), y = AbundProd)) +
   geom_boxplot() +
   labs(
@@ -739,15 +801,544 @@ ggplot(interactions, aes(x = factor(real), y = AbundProd)) +
   theme_minimal()
 ```
 
-Subsample the network
+
+Another option: Instead of relying on entirely neutral processes, let's create an imaginary latent trait that governs interactions. Then we can degrade the network based on abundances and see if we're able to recover that signal strong enough through SVD to get reasonable predictive accuracy. 
+```{r}
+#n_plants <- 100; n_frugivores=50; n_links = 500; n_observed = 300; backgroundratio=3 #for debugging
+run_hidden_trait_simulation <- function(n_plants = 100, n_frugivores = 50, 
+                                        n_links = 500, n_observed = 300, backgroundratio=3, exprate=5) {
+
+  # Generate all combinations and assign random abundances AND a random latent feature that controls interactions
+  interactions <- expand.grid(FrugivoreID = 1:n_frugivores, 
+                              PlantID = 1:n_plants) %>% 
+    left_join(data.frame(FrugivoreID = 1:n_frugivores, 
+                         FrugAbund = rlnorm(n_frugivores), FrugTrait=runif(n_frugivores, 0,1)), by = "FrugivoreID") %>%
+    left_join(data.frame(PlantID = 1:n_plants, 
+                         PlantAbund = rlnorm(n_plants), PlantTrait=runif(n_plants,0,1)), by = "PlantID") %>%
+    mutate(AbundProd = PlantAbund * FrugAbund, TraitDist=abs(PlantTrait-FrugTrait)) #Make a column of abundance products AND of traitdistance similarity
+  interactions$interProb <- dexp(interactions$TraitDist, rate=exprate)/exprate
+  
+  # Assign "real" interactions NOW USING LATENT FEATURE (interProb)
+  interactions$real <- 0
+  interactions$real[sample(1:nrow(interactions), size = n_links, replace = FALSE, prob = interactions$interProb)] <- 1
+  
+which(interactions$real == 1)
+  # Degrade the network by hiding some links #NOW MORE LIKELY TO SAMPLE INTERACTIONS BETWEEN ABUNDANT SPECIES
+  interactions$obs <- NA
+  interactions$obs[sample(which(interactions$real == 1), size = n_observed, replace = FALSE, prob=interactions$AbundProd[which(interactions$real == 1)])] <- 1 #Correctly get n_observed
+  interactions$obs[is.na(interactions$obs)] <- 0
+
+  # Rename species
+  interactions$FrugivoreID <- paste0("F", interactions$FrugivoreID)
+  interactions$PlantID <- paste0("P", interactions$PlantID)
+
+  # Perform SVD latent feature reduction
+  mat_assym <- xtabs(obs ~ FrugivoreID + PlantID, data = interactions) #Make adj matrix
+  decomp <- svd(mat_assym)
+  u <- decomp$u
+  v <- data.frame(decomp$v)
+
+  # Trait tables
+  plantsSVD <- data.frame(PlantID = colnames(mat_assym), 
+                          Psvd1 = v[, 1], Psvd2 = v[, 2], Psvd3 = v[, 3])
+  frugSVD <- data.frame(FrugivoreID = rownames(mat_assym), 
+                        Fsvd1 = u[, 1], Fsvd2 = u[, 2], Fsvd3 = u[, 3])
+
+  # Merge traits
+  interactions <- interactions %>%
+    left_join(plantsSVD, by = "PlantID") %>%
+    left_join(frugSVD, by = "FrugivoreID")
+
+  # Create test/training split
+  test <- filter(interactions, real == 1 & obs == 0) #Test is all unoberved real
+  background <- filter(interactions, real == 0)
+  test <- bind_rows(test, background[sample(nrow(background), backgroundratio * nrow(test)), ]) #Add in some other missed 0's as a background ratio
+  
+  test$combo <- paste(test$FrugivoreID, test$PlantID, sep = "-") #create unifying column
+  interactions$combo <- paste(interactions$FrugivoreID, interactions$PlantID, sep = "-")
+
+  train <- filter(interactions, !combo %in% test$combo) 
+
+  # Rename for woodedWalk
+  train <- rename(train, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+  test  <- rename(test, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+
+  # Fit model based on latent traits
+  out <- woodedWalk_NoSplit(train, 
+                            FrugTraits = c("Fsvd1", "Fsvd2", "Fsvd3"), 
+                            PlantTraits = c("Psvd1", "Psvd2", "Psvd3"))
+
+  test$S <- stats::predict(out, newdata = test, type = "prob")[, 2] #Grab Svals
+  # Evaluate performance
+  rOC <- roc(data = test, response = real, predictor = S)
+  AUC <- rOC$auc
+  return(AUC)
+}
+```
+
+Let's run these two versions many times and investigate the parameter space. 
+```{r}
+#First load in our analysis function from the maintext
+woodedWalk_NoSplit <- function(dat, FrugTraits, PlantTraits, class_balancing=FALSE, balance_ratio=3, output_type="rfobject"){
+  if((output_type %in% c("rfobject", "predictions"))==FALSE){
+    stop("Invalid output_type: choices are performance or rfobject")
+  }
+  #Set up our data into a fully expanded edgelist
+  require(tidyr)
+  dat$real <- 1 #make a new column denoting all of these edges are real; important when we expand out to all pairwise connections later
+  dat <- dplyr::filter_at(dat, vars(c(FrugTraits, PlantTraits)), all_vars(!is.na(.))) #make sure we have data for all our predictors
+  
+  dat <- dplyr::select_at(dat, vars(c(Frugivore_Species, Plant_Species, real, FrugTraits, PlantTraits))) #Select our relevant predictors
+  dat %<>% unique(.) #Make sure we only have unique entries
+  full_L <- tidyr::expand(dat, Frugivore_Species, Plant_Species) #Expand to include all possible pairwise plant-frugivore interactions.
+  full_real <- dplyr::select(dat, Frugivore_Species, Plant_Species, real) %>% left_join(full_L, ., by = c("Frugivore_Species", "Plant_Species")) #notating which of our edges in this expanded data are real 
+  full_real$real[is.na(full_real$real)==TRUE] <- 0
+
+  full_real_frugs <- dat[,c("Frugivore_Species", FrugTraits)] %>% unique() %>% left_join(full_real, ., by="Frugivore_Species") #Add in our frugivore traits
+
+  full_real_both <- dat[,c("Plant_Species", PlantTraits)] %>% unique() %>% left_join(full_real_frugs, ., by="Plant_Species") #add in our plant traits
+  
+  full_real_both$real <- as.factor(full_real_both$real)
+  
+  rf<-randomForest::randomForest(real ~. -Frugivore_Species - Plant_Species, data=full_real_both, ntree=100)
+  #ROC <- roc(full_real_both$real, rf$votes[,2])
+  predictions <- stats::predict(rf, newdata=full_real_both, type="prob")
+  
+  if(output_type=="predictions"){
+    output <- full_real_both %>% select(., "Frugivore_Species", "Plant_Species", real)
+    output$S <- predictions[,2]
+    return(output)
+  }
+  
+  if(output_type=="rfobject"){
+    output <- rf
+  return(output)
+  }
+}
+
+tictoc::tic()
+nrep <- 50
+result <- NULL
+  for(x in seq(0.7,0.99, by=0.01)){ #sampling coverage
+    for(y in seq(50,1000, by=50)){ #number of total links
+      for(i in 1:nrep){
+        temp <- try(data.frame(sampling=x,ntotlinks=y,rep=i,AUC=run_latent_trait_simulation(n_plants = 100, n_frugivores = 50, n_links=y, n_observed=round(y*x))[1]))
+        if(class(temp)=="try-error"){
+          temp <- data.frame(sampling=x, ntotlinks=y, rep=i,AUC=NA)
+        }
+        result <- rbind(result,temp)
+      }
+      print(paste("done with sampling of ", x, " and nlinks of ", y, " with abundance",sep=""))
+    }
+  }
+t1 <- tictoc::toc()
+save(t1, result, file="abundanceSummary.rda")
+
+
+
+tictoc::tic()
+nrep <- 50
+result <- NULL
+  for(x in seq(0.7,0.99, by=0.01)){
+    for(y in seq(50,1000, by=50)){
+      for(i in 1:nrep){
+        temp <- try(data.frame(sampling=x,ntotlinks=y,rep=i,AUC=run_hidden_trait_simulation(n_plants = 100, n_frugivores = 50, n_links=y, n_observed=round(y*x))[1]))
+        if(class(temp)=="try-error"){
+          temp <- data.frame(sampling=x, ntotlinks=y, rep=i,AUC=NA)
+        }
+        result <- rbind(result,temp)
+      }
+      print(paste("done with sampling of ", x, " and nlinks of ", y, " with hidden feature",sep=""))
+    }
+  }
+t2 <- tictoc::toc()
+save(t2, result, file="hiddenSummary.rda")
+
+for(i in 1:10){
+try(data.frame(sampling=.96,ntotlinks=75,rep=i,AUC=run_latent_trait_simulation(n_plants = 100, n_frugivores = 50, n_links=y, n_observed=round(y*x))[1]))
+}
+```
+
+Now let's make a plot investigating the outputs of this. 
+```{r}
+load(file="abundanceSummary.rda")
+(t1$toc-t1$tic)/60/60
+abundmod <- result
+load(file="hiddenSummary.rda")
+(t2$toc-t2$tic)/60/60
+hiddenmod <- result
+```
 
 ```{r}
-interactions$obs <- NA
+abund_summary <- dplyr::group_by(abundmod, sampling, ntotlinks) %>% dplyr::summarise(., mnAUC=mean(AUC), sdAUC=sd(AUC))
+abundplot <- ggplot(abund_summary, aes(x = sampling, y = ntotlinks, fill = mnAUC)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Mean AUC", option = "plasma") +
+  scale_x_continuous(breaks = seq(0.7, .99, by = 0.01)) +
+  scale_y_continuous(breaks = seq(50,1000, by=50)) +
+  labs(
+    x = "Sampling completeness",
+    y = "Number of true links",
+    title="abundance-based model"
+  )  +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 0.2, size=8),
+    axis.text.y = element_text(size=8)
+  )
+```
 
-interactions
-sample(x=1:500, size=400, replace=FALSE)
+```{r}
+hidden_summary <- dplyr::group_by(hiddenmod, sampling, ntotlinks) %>% dplyr::summarise(., mnAUC=mean(AUC), sdAUC=sd(AUC))
+    title="hidden feature model"
+hiddenplot <- ggplot(hidden_summary, aes(x = sampling, y = ntotlinks, fill = mnAUC)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Mean AUC", option = "plasma") +
+  scale_x_continuous(breaks = seq(0.7, .99, by = 0.01)) +
+  scale_y_continuous(breaks = seq(50,1000, by=50)) +
+  labs(
+    x = "Sampling completeness",
+    y = "Number of true links",
+    title="hidden feature model"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 0.2, size=8),
+    axis.text.y = element_text(size=8)
+  )
+```
+
+```{r}
+#pdf(file="SimulatedPerformance_Latent.pdf")
+gridExtra::grid.arrange(abundplot,hiddenplot)
+#dev.off()
+```
+
+
+```{r}
+#n_plants <- 100; n_frugivores=50; n_links = 500; n_observed = 300; backgroundratio=3 #for debugging
+run_latent_trait_skewsamp_simulation <- function(n_plants = 100, n_frugivores = 50,
+                                        n_links = 500, n_observed = 300, backgroundratio=3, rndm=FALSE, aundweightsamp=T) {
+  # Generate all combinations
+  interactions <- expand.grid(FrugivoreID = 1:n_frugivores,
+                              PlantID = 1:n_plants) %>%
+    left_join(data.frame(FrugivoreID = 1:n_frugivores,
+                         FrugAbund = rlnorm(n_frugivores)), by = "FrugivoreID") %>%
+    left_join(data.frame(PlantID = 1:n_plants,
+                         PlantAbund = rlnorm(n_plants)), by = "PlantID") %>%
+    mutate(AbundProd = PlantAbund * FrugAbund) #Make a column of abundance products
+  # Assign "real" interactions using abundance-weighted probabilities
+  interactions$real <- 0
+  interactions$real[sample(1:nrow(interactions), size = n_links, replace = FALSE, prob = interactions$AbundProd)] <- 1
+ 
+  interactions$obs <- NA
+  
+  Y <- xtabs(real ~ FrugivoreID + PlantID, data = interactions) #Make adj matrix
+  Y
+  
+  if(aundweightsamp==T){ # Degrade the network by hiding some links AGAIN ABUNDANCE SAMPLING
+  interactions$obs[sample(which(interactions$real == 1), size = n_observed, replace = FALSE, prob=interactions$AbundProd[which(interactions$real == 1)])] <- 1 #Correctly get n_observed BASED ON ABUND
+  }
+  if(aundweightsamp==F){ # Degrade the network by hiding some links RANDOM SAMPLING
+  interactions$obs[sample(which(interactions$real == 1), size = n_observed, replace = FALSE)] <- 1 #Correctly get n_observed BASED ON ABUND
+  }
+  
+  interactions$obs[is.na(interactions$obs)] <- 0
+  # Rename species
+  interactions$FrugivoreID <- paste0("F", interactions$FrugivoreID)
+  interactions$PlantID <- paste0("P", interactions$PlantID)
+  # Perform SVD latent feature reduction
+  mat_assym <- xtabs(obs ~ FrugivoreID + PlantID, data = interactions) #Make adj matrix
+  decomp <- svd(mat_assym)
+  u <- decomp$u
+  v <- data.frame(decomp$v)
+  # Trait tables
+  plantsSVD <- data.frame(PlantID = colnames(mat_assym),
+                          Psvd1 = v[, 1], Psvd2 = v[, 2], Psvd3 = v[, 3])
+  frugSVD <- data.frame(FrugivoreID = rownames(mat_assym),
+                        Fsvd1 = u[, 1], Fsvd2 = u[, 2], Fsvd3 = u[, 3])
+  # Merge traits
+  interactions <- interactions %>%
+    left_join(plantsSVD, by = "PlantID") %>%
+    left_join(frugSVD, by = "FrugivoreID")
+  # Create test/training split
+  test <- filter(interactions, real == 1 & obs == 0) #Test is all unoberved real
+  background <- filter(interactions, real == 0)
+  test <- bind_rows(test, background[sample(nrow(background), backgroundratio * nrow(test)), ])
+  
+  
+  #Add in some other missed 0's as a background ratio
+  test$combo <- paste(test$FrugivoreID, test$PlantID, sep = "-") #create unifying column
+  interactions$combo <- paste(interactions$FrugivoreID, interactions$PlantID, sep = "-")
+  train <- filter(interactions, !combo %in% test$combo) #training is everything left (should this be re-evaluated?)
+  # Rename for woodedWalk
+  train <- rename(train, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+  test  <- rename(test, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+  
+  if(rndm==T){
+  test$real <- sample(test$real, length(test$real), replace=F)
+  }
+  # Fit model based on latent traits
+  out <- woodedWalk_NoSplit(train,
+                            FrugTraits = c("Fsvd1", "Fsvd2", "Fsvd3"),
+                            PlantTraits = c("Psvd1", "Psvd2", "Psvd3"), class_balancing = TRUE)
+  
+  test$S <- stats::predict(out, newdata = test, type = "prob")[, 2] #Grab Svals
+  
+  # Evaluate performance
+  rOC <- roc(data = test, response = real, predictor = S)
+  AUC <- rOC$auc
+  return(AUC)
+}
 
 ```
+
+```{r}
+tictoc::tic()
+nrep <- 50
+result <- NULL
+  for(x in seq(0.05,0.69, by=0.01)){
+    for(y in seq(50,1000, by=50)){
+      for(i in 1:nrep){
+        temp <- try(data.frame(sampling=x,ntotlinks=y,rep=i,AUC=run_latent_trait_skewsamp_simulation(n_plants = 100, n_frugivores = 50, n_links=y, n_observed=round(y*x))[1]))
+        if(class(temp)=="try-error"){
+          temp <- data.frame(sampling=x, ntotlinks=y, rep=i,AUC=NA)
+        }
+        result <- rbind(result,temp)
+      }
+      print(paste("done with sampling of ", x, " and nlinks of ", y, " with hidden feature",sep=""))
+      tictoc::toc()
+    }
+  }
+t4 <- tictoc::toc()
+save(t4, result, file="abundSkew_smallsamp.rda")
+```
+
+```{r}
+result2 <- result
+load(file="abundSkew_Samplerate.rda")
+result <- rbind(result, result2)
+```
+
+
+
+```{r}
+
+skew_summary <- dplyr::group_by(result, sampling, ntotlinks) %>% dplyr::summarise(., mnAUC=mean(AUC), sdAUC=sd(AUC)) %>% dplyr::filter(., sampling<0.96)
+
+nonskew_summary <- dplyr::group_by(result, sampling, ntotlinks) %>% dplyr::summarise(., mnAUC=mean(AUC), sdAUC=sd(AUC)) %>% dplyr::filter(., sampling<0.96)
+
+
+ggplot(nonskew_summary, aes(x = sampling, y = ntotlinks/(5000), fill = mnAUC)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Mean AUC", option = "plasma") +
+  scale_x_continuous(breaks = seq(0.05, 0.95, by = 0.05)) +
+  scale_y_continuous(
+    breaks = seq(0.01, 0.2, by = 0.01),
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  labs(
+    x = "Sampling completeness",
+    y = "Graph Connectence"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 0.2, size=8),
+    axis.text.y = element_text(size=8)
+  )
+
+
+
+```
+Looking at background points
+
+```{r}
+result <- NULL
+
+for(x in seq(0.05,0.95, by=0.01)){ #simulate across sampling completeness values 
+    for(y in seq(50,950, by=100)){ # simulate across connectance values
+      for(i in 1:nrep){
+        temp <- try(data.frame(sampling=x,ntotlinks=y,rep=i,AUC=run_latent_trait_skewsamp_simulation(n_plants = 100, n_frugivores = 50, n_links=y, n_observed=round(y*x), rndm=T)[1]))
+        if(class(temp)=="try-error"){
+          temp <- data.frame(sampling=x, ntotlinks=y, rep=i,AUC=NA)
+        }
+        result <- rbind(result,temp)
+      }
+      print(paste("done with sampling of ", x, " and nlinks of ", y, " with hidden feature",sep=""))
+      tictoc::toc()
+    }
+}
+
+#save(result, file="randomComp.rda")
+
+resutiny <- dplyr::group_by(result, sampling, ntotlinks) %>% dplyr::summarise(., mnAUC=mean(AUC), sdAUC=sd(AUC))
+
+ggplot(resutiny, aes(x = sampling, y = ntotlinks/(5000), fill = mnAUC)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Mean AUC", option = "plasma")
+
+tictoc::tic()
+nrep <- 50
+result <- NULL
+  for(x in seq(0.05,0.95, by=0.01)){
+    for(y in seq(50,1000, by=50)){
+      for(i in 1:nrep){
+        temp <- try(data.frame(sampling=x,ntotlinks=y,rep=i,AUC=run_latent_trait_skewsamp_simulation(n_plants = 100, n_frugivores = 50, n_links=y, n_observed=round(y*x))[1]))
+        if(class(temp)=="try-error"){
+          temp <- data.frame(sampling=x, ntotlinks=y, rep=i,AUC=NA)
+        }
+        result <- rbind(result,temp)
+      }
+      print(paste("done with sampling of ", x, " and nlinks of ", y, " with hidden feature",sep=""))
+      tictoc::toc()
+    }
+  }
+t5 <- tictoc::toc()
+#save(t5, result, file="Neutral_Noabundsamp.rda")
+
+hist(resutiny$mnAUC)
+```
+
+Ok, now let's work on the thing of seeing how SVD changes as you degrade a network
+```{r}
+#n_plants <- 100; n_frugivores=50; n_links = 500; n_observed = 300; backgroundratio=3 #for debugging
+run_latent_trait_skewsamp_simulation <- function(n_plants = 100, n_frugivores = 50,
+                                        n_links = 500, n_observed = 300, backgroundratio=3, rndm=FALSE, aundweightsamp=T) {
+  # Generate all combinations
+  interactions <- expand.grid(FrugivoreID = 1:n_frugivores,
+                              PlantID = 1:n_plants) %>%
+    left_join(data.frame(FrugivoreID = 1:n_frugivores,
+                         FrugAbund = rlnorm(n_frugivores)), by = "FrugivoreID") %>%
+    left_join(data.frame(PlantID = 1:n_plants,
+                         PlantAbund = rlnorm(n_plants)), by = "PlantID") %>%
+    mutate(AbundProd = PlantAbund * FrugAbund) #Make a column of abundance products
+  # Assign "real" interactions using abundance-weighted probabilities
+  interactions$real <- 0
+  interactions$real[sample(1:nrow(interactions), size = n_links, replace = FALSE, prob = interactions$AbundProd)] <- 1
+ 
+  interactions$obs <- NA
+  
+  Y <- xtabs(real ~ FrugivoreID + PlantID, data = interactions) #Make adj matrix
+  Y
+  
+  if(aundweightsamp==T){ # Degrade the network by hiding some links AGAIN ABUNDANCE SAMPLING
+  interactions$obs[sample(which(interactions$real == 1), size = n_observed, replace = FALSE, prob=interactions$AbundProd[which(interactions$real == 1)])] <- 1 #Correctly get n_observed BASED ON ABUND
+  }
+  if(aundweightsamp==F){ # Degrade the network by hiding some links RANDOM SAMPLING
+  interactions$obs[sample(which(interactions$real == 1), size = n_observed, replace = FALSE)] <- 1 #Correctly get n_observed BASED ON ABUND
+  }
+  
+  interactions$obs[is.na(interactions$obs)] <- 0
+  # Rename species
+  interactions$FrugivoreID <- paste0("F", interactions$FrugivoreID)
+  interactions$PlantID <- paste0("P", interactions$PlantID)
+  # Perform SVD latent feature reduction
+  mat_assym <- xtabs(obs ~ FrugivoreID + PlantID, data = interactions) #Make adj matrix
+  decomp <- svd(mat_assym)
+  u <- decomp$u
+  v <- data.frame(decomp$v)
+  # Trait tables
+  plantsSVD <- data.frame(PlantID = colnames(mat_assym),
+                          Psvd1 = v[, 1], Psvd2 = v[, 2], Psvd3 = v[, 3])
+  frugSVD <- data.frame(FrugivoreID = rownames(mat_assym),
+                        Fsvd1 = u[, 1], Fsvd2 = u[, 2], Fsvd3 = u[, 3])
+  # Merge traits
+  interactions <- interactions %>%
+    left_join(plantsSVD, by = "PlantID") %>%
+    left_join(frugSVD, by = "FrugivoreID")
+  # Create test/training split
+  test <- filter(interactions, real == 1 & obs == 0) #Test is all unoberved real
+  background <- filter(interactions, real == 0)
+  test <- bind_rows(test, background[sample(nrow(background), backgroundratio * nrow(test)), ])
+  
+  
+  #Add in some other missed 0's as a background ratio
+  test$combo <- paste(test$FrugivoreID, test$PlantID, sep = "-") #create unifying column
+  interactions$combo <- paste(interactions$FrugivoreID, interactions$PlantID, sep = "-")
+  train <- filter(interactions, !combo %in% test$combo) #training is everything left (should this be re-evaluated?)
+  # Rename for woodedWalk
+  train <- rename(train, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+  test  <- rename(test, Frugivore_Species = FrugivoreID, Plant_Species = PlantID)
+  
+  if(rndm==T){
+  test$real <- sample(test$real, length(test$real), replace=F)
+  }
+  # Fit model based on latent traits
+  out <- woodedWalk_NoSplit(train,
+                            FrugTraits = c("Fsvd1", "Fsvd2", "Fsvd3"),
+                            PlantTraits = c("Psvd1", "Psvd2", "Psvd3"), class_balancing = TRUE)
+  
+  test$S <- stats::predict(out, newdata = test, type = "prob")[, 2] #Grab Svals
+  
+  # Evaluate performance
+  rOC <- roc(data = test, response = real, predictor = S)
+  AUC <- rOC$auc
+  return(AUC)
+}
+```
+
+
+Trying again of running across param spaces, this time with variable graph size
+
+```{r}
+gsizes <- data.frame(f=c(25,50,100),p=c(50,100,200))
+
+result <- NULL
+for(x in seq(0.05,0.95, by=0.05)){ #simulate across sampling completeness values 
+    for(y in c(0.01, 0.05, 0.1, 0.2, 0.33)){ # simulate across connectance values
+      for(g in 1:nrow(gsizes)){
+        for(i in 1:nrep){
+          temp <- try(data.frame(sampling=x,
+                                 ntotlinks=round(gsizes[g,1]*gsizes[g,2]*y),
+                                 gsize=gsizes[g,1]*gsizes[g,2],
+                                 connectance=y,
+                                 rep=i,AUC=run_latent_trait_skewsamp_simulation(n_plants = gsizes[g,2], n_frugivores = gsizes[g,1], n_links=round(gsizes[g,1]*gsizes[g,2]*y), n_observed=round(gsizes[g,1]*gsizes[g,2]*y*x), rndm=T)[1]))
+        
+        if(class(temp)=="try-error"){
+          temp <- data.frame(sampling=x, ntotlinks=y, 
+                                 gsize=gsizes[g,1]*gsizes[g,2],
+                                 connectance=y,rep=i, AUC=NA)
+        }
+        result <- rbind(result,temp)
+      }
+    }
+    }
+        print(paste("done with sampling completeness of", x))
+}
+
+#save(result, file="selectversion2.RDA")
+```
+
+Plotting this new version
+```{r, echo=FALSE}
+load(file="selectversion2.RDA")
+resum <- result %>% dplyr::group_by(., gsize, connectance, sampling) %>% dplyr::summarize(., mnAUC=mean(AUC), sdAUC=sd(AUC))
+resum$degrade <- 1-resum$sampling
+
+
+facetnames <- c(
+                    `0.01` = "True Connectance: 1%",
+                    `0.05` = "True Connectance: 5%",
+                    `0.1` = "True Connectance: 10%",
+                    `0.2` = "True Connectance: 20%"
+                    )
+
+pdf(file="nullsimulationResult.pdf", width=8, height=8)
+resum %>% dplyr::filter(., connectance<0.33) %>%
+ggplot(data = ., aes(x = degrade, y = mnAUC, colour = as.factor(gsize))) +
+  geom_line() +
+  geom_errorbar(aes(ymin = mnAUC - sdAUC/sqrt(50), ymax = mnAUC + sdAUC/sqrt(50)), width = 0.02) +
+  facet_wrap(~connectance, labeller = as_labeller(facetnames))+
+  theme_classic()+ guides(colour=guide_legend(title="Graph Size"))+
+  scale_color_discrete(labels=c('Small (75 nodes)', 'Medium (150 nodes)', 'Large (300 nodes)'))+
+  ylab("Mean AUC")+
+  xlab("Proportion of links removed")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+dev.off()
+```
+
 
 
 
